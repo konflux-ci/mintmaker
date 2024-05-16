@@ -4,7 +4,6 @@ FROM registry.access.redhat.com/ubi9/go-toolset:1.20 as builder
 ARG TARGETOS
 ARG TARGETARCH
 
-WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -18,17 +17,13 @@ COPY api/ api/
 COPY internal/controller/ internal/controller/
 
 # Build
-# the GOARCH has not a default value to allow the binary be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager cmd/main.go
 
 # Use ubi-micro as minimal base image to package the manager binary
 # See https://catalog.redhat.com/software/containers/ubi9/ubi-micro/615bdf943f6014fa45ae1b58
 FROM registry.access.redhat.com/ubi9/ubi-micro:9.3-9
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /opt/app-root/src/manager .
 
 # It is mandatory to set these labels
 LABEL name="Konflux Mintmaker"
