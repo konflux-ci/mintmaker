@@ -65,11 +65,17 @@ func (g BasicAuthTaskProvider) GetNewTasks(ctx context.Context, components []*gi
 						}
 						// Step 6
 						if !AddNewRepoToTasksOnTheSameHostsWithSameCredentials(tasksOnHost, component, creds) {
+							branch := component.Branch()
+							// When platform is gitlab and branch is missing, use "main" branch
+							// TODO: check Gitlab to determine the default branch
+							if component.Platform() == "gitlab" && branch == git.InternalDefaultBranch {
+								branch = "main"
+							}
 							// Step 7
 							tasksOnHost = append(tasksOnHost, NewBasicAuthTask(platform, host, endpoint, creds, []*Repository{
 								{
 									Repository:   component.Repository(),
-									BaseBranches: []string{component.Branch()},
+									BaseBranches: []string{branch},
 								},
 							}))
 						}

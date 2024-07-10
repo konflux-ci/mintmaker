@@ -152,6 +152,27 @@ func TestNewTasks(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name:            "GitLab component should use main branch if revision is missing",
+			credentialsFunc: StaticCredentialsFunc,
+			components: []*git.ScmComponent{
+				ignoreError(
+					git.NewScmComponent(
+						"gitlab",
+						"https://gitlab.com/umbrellacorp/devfile-sample-go-basic",
+						"",
+						"devfile-sample-go-basic",
+						"umbrellacorp-tenant")).(*git.ScmComponent),
+			},
+			expected: []*Task{
+				NewBasicAuthTask("gitlab", "gitlab.com", "https://gitlab.com/api/v4/", staticCredentials, []*Repository{
+					{
+						Repository:   "umbrellacorp/devfile-sample-go-basic",
+						BaseBranches: []string{"main"},
+					},
+				}),
+			},
+		},
 	}
 
 	for _, tt := range tests {
