@@ -200,27 +200,29 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 	if err != nil {
 		return err
 	}
-	caVolume := corev1.Volume{
-		Name: "trusted-ca",
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: caConfigMap.Name},
-				Items: []corev1.KeyToPath{
-					{
-						Key:  "ca-bundle.crt",
-						Path: "tls-ca-bundle.pem",
+	if caConfigMap != nil {
+		caVolume := corev1.Volume{
+			Name: "trusted-ca",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: caConfigMap.Name},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "ca-bundle.crt",
+							Path: "tls-ca-bundle.pem",
+						},
 					},
 				},
 			},
-		},
+		}
+		caVolumeMount := corev1.VolumeMount{
+			Name:      "trusted-ca",
+			MountPath: "/etc/pki/ca-trust/extracted/pem",
+			ReadOnly:  true,
+		}
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, caVolume)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, caVolumeMount)
 	}
-	caVolumeMount := corev1.VolumeMount{
-		Name:      "trusted-ca",
-		MountPath: "/etc/pki/ca-trust/extracted/pem",
-		ReadOnly:  true,
-	}
-	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, caVolume)
-	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, caVolumeMount)
 
 	// Create the job
 	if err := j.client.Create(ctx, job); err != nil {
