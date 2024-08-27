@@ -2,6 +2,8 @@ package renovate
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -79,6 +81,93 @@ func (j *JobCoordinator) getCAConfigMap(ctx context.Context) (*corev1.ConfigMap,
 	return nil, nil
 }
 
+// Create a secret that merges all secret with the label:
+// mintmaker.appstudio.redhat.com/secret-type: registry
+// and return the new secret
+func (j *JobCoordinator) createMergedPullSecret(ctx context.Context) (*corev1.Secret, error) {
+	log := logger.FromContext(ctx)
+
+	secretList := &corev1.SecretList{}
+	labelSelector := client.MatchingLabels{"mintmaker.appstudio.redhat.com/secret-type": "registry"}
+	listOptions := []client.ListOption{
+		client.InNamespace(MintMakerNamespaceName),
+		labelSelector,
+	}
+
+	err := j.client.List(ctx, secretList, listOptions...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(secretList.Items) == 0 {
+		// No secrets to merge
+		return nil, nil
+	}
+
+	log.Info(fmt.Sprintf("Found %d secrets to merge", len(secretList.Items)))
+
+	mergedAuths := make(map[string]interface{})
+	for _, secret := range secretList.Items {
+		if secret.Type == corev1.SecretTypeDockerConfigJson {
+			data, exists := secret.Data[".dockerconfigjson"]
+			if !exists {
+				// No .dockerconfigjson section
+				continue
+			}
+
+			decodedData, err := base64.StdEncoding.DecodeString(string(data))
+			if err != nil {
+				log.Info("Couldn't decode base64 secret data, the secret could be stored in plain text")
+				decodedData = data
+			}
+
+			var dockerConfig map[string]interface{}
+			if err := json.Unmarshal(decodedData, &dockerConfig); err != nil {
+				return nil, err
+			}
+
+			auths, exists := dockerConfig["auths"].(map[string]interface{})
+			if !exists {
+				continue
+			}
+
+			for registry, creds := range auths {
+				mergedAuths[registry] = creds
+			}
+		}
+	}
+
+	mergedDockerConfig := map[string]interface{}{
+		"auths": mergedAuths,
+	}
+
+	mergedConfigJson, err := json.Marshal(mergedDockerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	timestamp := time.Now().Unix()
+	name := fmt.Sprintf("merged-registry-image-pull-secret-%d-%s", timestamp, RandomString(5))
+
+	newSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: MintMakerNamespaceName,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(mergedConfigJson),
+		},
+	}
+
+	if err := j.client.Create(ctx, newSecret); err != nil {
+		return nil, err
+	}
+
+	return newSecret, nil
+}
+
 func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 
 	if len(tasks) == 0 {
@@ -111,6 +200,8 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 	if len(renovateCmd) == 0 {
 		return nil
 	}
+
+	registry_secret, err := j.createMergedPullSecret(ctx)
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -146,6 +237,20 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 								},
 							},
 						},
+						{
+							Name: "registry-secrets",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: registry_secret.Name,
+									Items: []corev1.KeyToPath{
+										{
+											Key:  ".dockerconfigjson",
+											Path: "config.json",
+										},
+									},
+								},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
@@ -166,6 +271,10 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 								{
 									Name:      name,
 									MountPath: "/configs",
+								},
+								{
+									Name:      "registry-secrets",
+									MountPath: "/.docker",
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
