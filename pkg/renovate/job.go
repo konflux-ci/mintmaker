@@ -2,7 +2,6 @@ package renovate
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -113,17 +112,12 @@ func (j *JobCoordinator) createMergedPullSecret(ctx context.Context) (*corev1.Se
 			data, exists := secret.Data[".dockerconfigjson"]
 			if !exists {
 				// No .dockerconfigjson section
-				continue
-			}
-
-			decodedData, err := base64.StdEncoding.DecodeString(string(data))
-			if err != nil {
-				log.Info("Couldn't decode base64 secret data, the secret could be stored in plain text")
-				decodedData = data
+				log.Info("Found secret without .dockerconfigjson section")
+				return nil, nil
 			}
 
 			var dockerConfig map[string]interface{}
-			if err := json.Unmarshal(decodedData, &dockerConfig); err != nil {
+			if err := json.Unmarshal(data, &dockerConfig); err != nil {
 				return nil, err
 			}
 
@@ -142,13 +136,18 @@ func (j *JobCoordinator) createMergedPullSecret(ctx context.Context) (*corev1.Se
 		"auths": mergedAuths,
 	}
 
+	if len(mergedAuths) == 0 {
+		log.Info("Merged auths empty, skipping creation of secret")
+		return nil, nil
+	}
+
 	mergedConfigJson, err := json.Marshal(mergedDockerConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	timestamp := time.Now().Unix()
-	name := fmt.Sprintf("merged-registry-image-pull-secret-%d-%s", timestamp, RandomString(5))
+	name := fmt.Sprintf("renovate-image-pull-secrets-%d-%s", timestamp, RandomString(5))
 
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -237,20 +236,6 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 								},
 							},
 						},
-						{
-							Name: "registry-secrets",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: registry_secret.Name,
-									Items: []corev1.KeyToPath{
-										{
-											Key:  ".dockerconfigjson",
-											Path: "config.json",
-										},
-									},
-								},
-							},
-						},
 					},
 					Containers: []corev1.Container{
 						{
@@ -271,10 +256,6 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 								{
 									Name:      name,
 									MountPath: "/configs",
-								},
-								{
-									Name:      "registry-secrets",
-									MountPath: "/.docker",
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
@@ -333,15 +314,48 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, caVolumeMount)
 	}
 
+	if registry_secret != nil {
+		registrySecretVolume := corev1.Volume{
+			Name: "registry-secrets",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: registry_secret.Name,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  ".dockerconfigjson",
+							Path: "config.json",
+						},
+					},
+				},
+			},
+		}
+		registrySecretMount := corev1.VolumeMount{
+			Name:      "registry-secrets",
+			MountPath: "/.docker",
+			ReadOnly:  true,
+		}
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, registrySecretVolume)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, registrySecretMount)
+	}
+
 	// Create the job
 	if err := j.client.Create(ctx, job); err != nil {
 		return err
 	}
 	log.Info("renovate job created", "jobname", job.Name, "tasks", len(tasks))
+
+	// Set ownership so all resources get deleted once the job finishes
 	if err := controllerutil.SetOwnerReference(job, secret, j.scheme); err != nil {
 		return err
 	}
 	if err := j.client.Update(ctx, secret); err != nil {
+		return err
+	}
+
+	if err := controllerutil.SetOwnerReference(job, registry_secret, j.scheme); err != nil {
+		return err
+	}
+	if err := j.client.Update(ctx, registry_secret); err != nil {
 		return err
 	}
 
