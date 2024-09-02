@@ -344,7 +344,7 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 	}
 	log.Info("renovate job created", "jobname", job.Name, "tasks", len(tasks))
 
-	// Set ownership so all resources get deleted once the job finishes
+	// Set ownership so all resources get deleted once the job is deleted
 	if err := controllerutil.SetOwnerReference(job, secret, j.scheme); err != nil {
 		return err
 	}
