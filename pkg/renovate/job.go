@@ -181,17 +181,20 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 	secretTokens := map[string]string{}
 	configMapData := map[string]string{}
 	var renovateCmd []string
+
+	// Create a merged secret for private registries
+	registry_secret, err := j.createMergedPullSecret(ctx)
+
 	for _, task := range tasks {
 		taskId := RandomString(5)
 		secretTokens[taskId] = task.Token
 
-		config, err := task.GetJobConfig(ctx, j.client)
+		config, err := task.GetJobConfig(ctx, j.client, registry_secret)
 		if err != nil {
 			return err
 		}
 		configMapData[fmt.Sprintf("%s.json", taskId)] = config
 
-		log.Info(fmt.Sprintf("Creating renovate config map entry with length %d and value %s", len(config), config))
 		renovateCmd = append(renovateCmd,
 			fmt.Sprintf("RENOVATE_TOKEN=$TOKEN_%s RENOVATE_CONFIG_FILE=/configs/%s.json renovate || true", taskId, taskId),
 		)
@@ -199,8 +202,6 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 	if len(renovateCmd) == 0 {
 		return nil
 	}
-
-	registry_secret, err := j.createMergedPullSecret(ctx)
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

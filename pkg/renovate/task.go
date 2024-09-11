@@ -2,12 +2,17 @@ package renovate
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	"github.com/konflux-ci/mintmaker/pkg/git"
 	"github.com/konflux-ci/mintmaker/pkg/git/credentials"
+	logger "sigs.k8s.io/controller-runtime/pkg/log"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,7 +68,56 @@ type TaskProvider interface {
 	GetNewTasks(ctx context.Context, components []*git.ScmComponent) []*Task
 }
 
-func (t *Task) GetJobConfig(ctx context.Context, client client.Client) (string, error) {
+type HostRule map[string]string
+
+func (t *Task) TransformHostRules(ctx context.Context, registrySecret *corev1.Secret) ([]HostRule, error) {
+	log := logger.FromContext(ctx)
+
+	if registrySecret == nil {
+		return nil, errors.New("Registry secret is nil")
+	}
+
+	var hostRules []HostRule
+	var secrets map[string]map[string]HostRule
+
+	err := json.Unmarshal(registrySecret.Data[".dockerconfigjson"], &secrets)
+
+	if err != nil {
+		log.Info(fmt.Sprintf("Cannot unmarshal registry secret: %s", err))
+		return nil, err
+	}
+
+	for registry, credentials := range secrets["auths"] {
+		hostRule := HostRule{}
+		hostRule["matchHost"] = registry
+
+		if _, ok := credentials["auth"]; ok {
+			auth_plain, err := base64.StdEncoding.DecodeString(string(credentials["auth"]))
+
+			if err != nil {
+				log.Info("Cannot base64 decode auth")
+				return nil, err
+			}
+
+			username, password, found := strings.Cut(string(auth_plain), ":")
+
+			if !found {
+				log.Info("Could not find delimiter in auth")
+				return nil, errors.New("Could not find delimiter in auth")
+			}
+
+			hostRule["username"] = username
+			hostRule["password"] = password
+			hostRule["hostType"] = "docker"
+		}
+
+		hostRules = append(hostRules, hostRule)
+	}
+
+	return hostRules, nil
+}
+
+func (t *Task) GetJobConfig(ctx context.Context, client client.Client, registrySecret *corev1.Secret) (string, error) {
 	defaultConfig := corev1.ConfigMap{}
 	renovateDefaultConfig := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: RenovateConfigMapName}
 	if err := client.Get(ctx, renovateDefaultConfig, &defaultConfig); err != nil {
@@ -79,6 +133,14 @@ func (t *Task) GetJobConfig(ctx context.Context, client client.Client) (string, 
 	config["endpoint"] = t.Endpoint
 	config["username"] = t.Username
 	config["gitAuthor"] = t.GitAuthor
+
+	if registrySecret != nil {
+		hostRules, err := t.TransformHostRules(ctx, registrySecret)
+
+		if err == nil {
+			config["hostRules"] = hostRules
+		}
+	}
 
 	repos, _ := json.Marshal(t.Repositories)
 	var repoData []map[string]interface{}
