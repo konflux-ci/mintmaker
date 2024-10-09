@@ -79,8 +79,43 @@ To contribute to MintMaker you need to be part of the [MintMaker Maintainers](ht
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
-## Additional documentation
-You can find additional documentation here: [MintMaker docs](https://redhat-exd-rebuilds.github.io/mintmaker-docs/).
+## Release process
+
+MintMaker is released to Konflux through the [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repository.
+
+**Staging** environment uses the `latest` tag of [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image/),
+referenced in [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/staging/base/manager_patches.yaml).
+
+**Production** environment uses a fixed tag and commit for the configuration.
+
+In order to release MintMaker, create a PR in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
+with the following changes:
+
+In [kustomization.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/production/base/kustomization.yaml):
+
+- If there was a change to the [default MintMaker config](https://github.com/konflux-ci/mintmaker/blob/main/config/renovate/renovate.json), modify the git commit
+  hashes in `resources` to reflect that.
+- If there was a change to the [MintMaker controller](https://github.com/konflux-ci/mintmaker) (this repository),
+  change the container image tag in `images.newTag` property. This needs
+  to be a valid and existing tag available in the quay.io repository.
+
+In [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/production/base/manager_patches.yaml):
+
+- If there was a change to [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image/), change the
+  container image tag.
+
+> [!WARNING]
+> Always check the image tag(s) you propose in the PR actually exist
+> in the Quay repositories. It is possible (however unlikely) that the build
+> pipeline fails to build or push the image to the registry. This would
+> result in the pods not being able to start up in Konflux.
+
+After the PR is approved and merged, the deployment will start automatically.
+
+> [!IMPORTANT]
+> During the release process, please make sure to actively monitor at least
+> one cluster's `mintmaker` namespace for any issues, most often it would
+> be a `ImagePullBackOff` error for the controller pod, if anything went wrong.
 
 ## License
 
