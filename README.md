@@ -84,11 +84,12 @@ More information can be found via the [Kubebuilder Documentation](https://book.k
 MintMaker is released to Konflux through the [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repository.
 
 **Staging** environment uses the `latest` tag of [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image/),
-referenced in [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/staging/base/manager_patches.yaml).
+referenced in [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/staging/base/manager_patches.yaml). The PRs for this environment are
+created automatically.
 
 **Production** environment uses a fixed tag and commit for the configuration.
 
-In order to release MintMaker, create a PR in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
+In order to release MintMaker to *production*, create a PR in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
 with the following changes:
 
 In [kustomization.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/production/base/kustomization.yaml):
