@@ -100,19 +100,21 @@
     "additionalBranchPrefix": "{{baseBranch}}/",
     "branchPrefix": "konflux/mintmaker/"
   },
+  "rpm": {
+    "enabled": true,
+    "packageRules": {
+      "groupName": "RPM updates",
+      "commitMessageAction": "",
+      "commitMessageTopic": "RPM updates",
+      "prTitle": "RPM updates"
+    },
+    "additionalBranchPrefix": "{{baseBranch}}/",
+    "branchPrefix": "konflux/mintmaker/"
+  },
   "git-submodules": {
     "enabled": true,
     "additionalBranchPrefix": "{{baseBranch}}/",
     "branchPrefix": "konflux/mintmaker/"
-  },
-  "lockFileMaintenance": {
-    "enabled": true,
-    "recreateWhen": "always",
-    "rebaseWhen": "behind-base-branch",
-    "branchTopic": "lock-file-maintenance",
-    "schedule": [
-      "at any time"
-    ]
   },
   "argocd": {
     "additionalBranchPrefix": "{{baseBranch}}/",
