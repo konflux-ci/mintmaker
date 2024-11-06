@@ -11,7 +11,7 @@
   "onboarding": false,
   "requireConfig": "optional",
   "inheritConfig": true,
-  "platformCommit": true,
+  "platformCommit": "enabled",
   "autodiscover": false,
   "vulnerabilityAlerts": {
     "enabled": false
