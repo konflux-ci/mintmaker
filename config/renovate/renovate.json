@@ -113,6 +113,15 @@
     "additionalBranchPrefix": "{{baseBranch}}/",
     "branchPrefix": "konflux/mintmaker/"
   },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "recreateWhen": "always",
+    "rebaseWhen": "behind-base-branch",
+    "branchTopic": "lock-file-maintenance",
+    "schedule": [
+      "at any time"
+    ]
+  },
   "git-submodules": {
     "enabled": true,
     "additionalBranchPrefix": "{{baseBranch}}/",
