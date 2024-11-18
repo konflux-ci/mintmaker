@@ -20,8 +20,8 @@
     "packageRules": [
         {
             "description": "Don't suggest bumping to unstable fedora release",
-            "matchPackagePatterns": [
-                "[\\w.-\\/]+\\/fedora[\\w-]*"
+            "matchPackageNames": [
+                "/[\\w.-\\/]+\\/fedora[\\w-]*/"
             ],
             "matchManagers": [
                 "dockerfile",
