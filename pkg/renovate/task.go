@@ -117,7 +117,7 @@ func (t *Task) TransformHostRules(ctx context.Context, registrySecret *corev1.Se
 	return hostRules, nil
 }
 
-func (t *Task) GetJobConfig(ctx context.Context, client client.Client, registrySecret *corev1.Secret) (string, error) {
+func (t *Task) GetPipelineRunConfig(ctx context.Context, client client.Client, registrySecret *corev1.Secret) (string, error) {
 	defaultConfig := corev1.ConfigMap{}
 	renovateDefaultConfig := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: RenovateConfigMapName}
 	if err := client.Get(ctx, renovateDefaultConfig, &defaultConfig); err != nil {

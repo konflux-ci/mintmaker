@@ -72,6 +72,29 @@ make uninstall
 make undeploy
 ```
 
+## Testing
+
+To run the tests, run:
+
+```sh
+make test
+```
+
+In case you are getting an error like this:
+
+```sh
+panic: runtime error: invalid memory address or nil pointer dereference
+```
+
+and in the trace you can see that the `controller-tools` version `v0.13.0` is being used, make sure to upgrade to `v0.14.0`.
+To do that, run:
+
+```sh
+go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+GOBIN=$PWD/bin go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+./bin/controller-gen --version
+```
+
 ## Contributing
 To contribute to MintMaker you need to be part of the [MintMaker Maintainers](https://github.com/orgs/konflux-ci/teams/mintmaker-maintainers) team.
 
