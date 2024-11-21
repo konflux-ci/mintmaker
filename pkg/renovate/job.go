@@ -242,6 +242,12 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 						{
 							Name:  "renovate",
 							Image: j.renovateImageUrl,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "HOME",
+									Value: "/home/renovate",
+								},
+							},
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									Prefix: "TOKEN_",
