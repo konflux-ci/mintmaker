@@ -1,5 +1,5 @@
 # MintMaker
-MintMaker is designed to automate the process of checking and updating dependencies for components in Konflux. It utilizes [https://docs.renovatebot.com/](Renovate), a dependency update tool.
+MintMaker is designed to automate the process of checking and updating dependencies for components in Konflux. It utilizes [Renovate](https://docs.renovatebot.com), a dependency update tool.
 
 ## Description
 
