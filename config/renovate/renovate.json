@@ -38,7 +38,6 @@
     "git-submodules",
     "hermit",
     "homebrew",
-    "nix",
     "osgi",
     "pre-commit",
     "vendir",
@@ -245,14 +244,6 @@
     ]
   },
   "homebrew": {
-    "additionalBranchPrefix": "{{baseBranch}}/",
-    "branchPrefix": "konflux/mintmaker/",
-    "schedule": [
-      "after 5am on thursday"
-    ]
-  },
-  "nix": {
-    "enabled": true,
     "additionalBranchPrefix": "{{baseBranch}}/",
     "branchPrefix": "konflux/mintmaker/",
     "schedule": [
