@@ -22,12 +22,17 @@ import (
 
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+)
+
+const (
+	MaxSimultaneousPipelineRuns = 20
 )
 
 // PipelineRunReconciler reconciles a PipelineRun object
@@ -53,6 +58,22 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	//FIXME get number of running pipelines
+	pipelinerun := &tektonv1beta1.PipelineRun{}
+	err := r.Client.Get(ctx, req.NamespacedName, pipelinerun)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+	}
+	log.Info(fmt.Sprintf("pipelinerun: %v", pipelinerun)) //FIXME debug, remove after done
+	//TODO okay, let's try to run this controller, and see what is stored in 'pipelinerun'... is there info about the current pipelines?
+
+	//FIXME compare to number of allowed pipelines
+
+	//FIXME delete 'pending' status of one pipeline
+
+	//FIXME check if this log message prints something useful
 	log.Info(fmt.Sprintf("PipelineRun is updated: %v", req.NamespacedName))
 
 	return ctrl.Result{}, nil
