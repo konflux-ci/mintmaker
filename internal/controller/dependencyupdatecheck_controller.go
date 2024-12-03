@@ -42,13 +42,13 @@ const (
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
-	client client.Client
+	Client client.Client
 	Scheme *runtime.Scheme
 }
 
 func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
-		client: client,
+		Client: client,
 		Scheme: scheme,
 	}
 }
@@ -93,7 +93,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context)
 		},
 	}
 
-	if err := r.client.Create(ctx, pipelineRun); err != nil {
+	if err := r.Client.Create(ctx, pipelineRun); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +117,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	dependencyupdatecheck := &mmv1alpha1.DependencyUpdateCheck{}
-	err := r.client.Get(ctx, req.NamespacedName, dependencyupdatecheck)
+	err := r.Client.Get(ctx, req.NamespacedName, dependencyupdatecheck)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -137,7 +137,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 	dependencyupdatecheck.Annotations[MintMakerProcessedAnnotationName] = "true"
 
-	err = r.client.Update(ctx, dependencyupdatecheck)
+	err = r.Client.Update(ctx, dependencyupdatecheck)
 	if err != nil {
 		log.Error(err, "failed to update DependencyUpdateCheck annotations")
 		return ctrl.Result{}, nil
