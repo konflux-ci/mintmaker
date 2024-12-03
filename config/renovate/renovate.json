@@ -83,7 +83,6 @@
         },
         "commitMessageTopic": "Konflux references",
         "semanticCommits": "enabled",
-        "prFooter": "To execute skipped test pipelines write comment `/ok-to-test`",
         "prBodyColumns": [
           "Package",
           "Change",
