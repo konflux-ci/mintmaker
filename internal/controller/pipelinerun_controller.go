@@ -61,37 +61,55 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	//FIXME get number of running pipelines
-	pipelinerun := &tektonv1beta1.PipelineRun{}
-	err := r.Client.Get(ctx, req.NamespacedName, pipelinerun)
+	var pipelineRuns tektonv1beta1.PipelineRun
+	err := r.Client.Get(ctx, req.NamespacedName, &pipelineRuns)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			log.Error(err, "Unable to fetch PipelineRun")
+			return ctrl.Result{}, err
 		}
 	}
-	log.Info(fmt.Sprintf("pipelinerun: %v", pipelinerun)) //FIXME debug, remove after done
-	log.Info(spew.Sdump(pipelinerun))                     //FIXME debug, remove after done
-	//TODO okay, let's try to run this controller, and see what is stored in 'pipelinerun'... is there info about the current pipelines?
 
-	// running_pprns := 19
+	log.Info(fmt.Sprintf("pipelineRuns: %v", pipelineRuns)) //FIXME debug, remove after done
+	log.Info("\n\n[spew]")
+	log.Info(spew.Sdump(pipelineRuns)) //FIXME debug, remove after done
 
-	//FIXME compare to number of allowed pipelines
-	// if running_pprns < MaxSimultaneousPipelineRuns {
-	// 	//FIXME delete 'pending' status of one pipeline
+	var childPipelineRuns tektonv1beta1.PipelineRunList
+	err = r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
+	if err != nil {
+		log.Error(err, "Unable to list child pipelineruns")
+		return ctrl.Result{}, err
+	}
 
-	// }
+	log.Info(fmt.Sprintf("childPipelineRuns: %v", childPipelineRuns)) //FIXME debug, remove after done
+	log.Info("\n\n[spew]")
+	log.Info(spew.Sdump(childPipelineRuns)) //FIXME debug, remove after done
 
-	//FIXME check if this log message prints something useful
-	log.Info(fmt.Sprintf("PipelineRun is updated: %v", req.NamespacedName))
+	var runningPipelineRuns []*tektonv1beta1.PipelineRun
+	for i, pipelineRun := range childPipelineRuns.Items {
+		if pipelineRun.IsPending() {
+			runningPipelineRuns = append(runningPipelineRuns, &childPipelineRuns.Items[i])
+		}
+	}
+	numRunning := len(runningPipelineRuns)
+
+	log.Info("running pipelineRuns count", "numRunning", numRunning)
+
+	if numRunning < MaxSimultaneousPipelineRuns {
+		for _, pipelineRun := range childPipelineRuns.Items {
+			if pipelineRun.IsPending() {
+				log.Info(fmt.Sprintf("\n\nPipelineRun before update: %v", req.NamespacedName)) //FIXME remove after debug
+				pipelineRun.Spec.Status = ""                                                   // FIXME did not work!
+				log.Info(fmt.Sprintf("\n\nPipelineRun is updated (pending state removed): %v", req.NamespacedName))
+			}
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
-	fmt.Println("hello from PipelineRunReconciler.SetupWithManager") //FIXME debug, remove after done
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tektonv1beta1.PipelineRun{}).
 		/* TODO: For the time being we just ignore all types of events
