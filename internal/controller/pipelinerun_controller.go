@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +38,7 @@ const (
 
 // PipelineRunReconciler reconciles a PipelineRun object
 type PipelineRunReconciler struct {
-	client.Client
+	Client client.Client
 	Scheme *runtime.Scheme
 }
 
@@ -54,6 +55,8 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log := ctrllog.FromContext(ctx).WithName("PipelineRun")
 	ctx = ctrllog.IntoContext(ctx, log)
 
+	log.Info("hello from PipelineRunReconciler.Reconcile") //FIXME debug, remove after done
+
 	if req.Namespace != MintMakerNamespaceName {
 		return ctrl.Result{}, nil
 	}
@@ -67,11 +70,16 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 	log.Info(fmt.Sprintf("pipelinerun: %v", pipelinerun)) //FIXME debug, remove after done
+	log.Info(spew.Sdump(pipelinerun))                     //FIXME debug, remove after done
 	//TODO okay, let's try to run this controller, and see what is stored in 'pipelinerun'... is there info about the current pipelines?
 
-	//FIXME compare to number of allowed pipelines
+	// running_pprns := 19
 
-	//FIXME delete 'pending' status of one pipeline
+	//FIXME compare to number of allowed pipelines
+	// if running_pprns < MaxSimultaneousPipelineRuns {
+	// 	//FIXME delete 'pending' status of one pipeline
+
+	// }
 
 	//FIXME check if this log message prints something useful
 	log.Info(fmt.Sprintf("PipelineRun is updated: %v", req.NamespacedName))
@@ -81,6 +89,9 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
+
+	fmt.Println("hello from PipelineRunReconciler.SetupWithManager") //FIXME debug, remove after done
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tektonv1beta1.PipelineRun{}).
 		/* TODO: For the time being we just ignore all types of events

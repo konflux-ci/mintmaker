@@ -141,6 +141,8 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "PipelineRun")
 		os.Exit(1)
 	}
+	setupLog.Info("PipelineRunReconciler created") //FIXME remove after debug
+	// setupLog.Info(spew.Sdump(mgr))                 //FIXME debug, remove after done
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
