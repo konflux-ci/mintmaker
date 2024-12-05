@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -322,12 +323,29 @@ func deleteDependencyUpdateCheck(resourceKey types.NamespacedName) {
 		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, dependencyUpdateCheck))
 	}, timeout, interval).Should(BeTrue())
 }
+
+func listPipelineRuns(namespace string) []tektonv1.PipelineRun {
+	pipelineruns := &tektonv1.PipelineRunList{}
+
+	err := k8sClient.List(ctx, pipelineruns, client.InNamespace(namespace))
+	Expect(err).ToNot(HaveOccurred())
+	return pipelineruns.Items
+}
+
 func listJobs(namespace string) []batch.Job {
 	jobs := &batch.JobList{}
 
 	err := k8sClient.List(ctx, jobs, client.InNamespace(namespace))
 	Expect(err).ToNot(HaveOccurred())
 	return jobs.Items
+}
+
+func deletePipelineRuns(namespace string) {
+	err := k8sClient.DeleteAllOf(ctx, &tektonv1.PipelineRun{}, client.InNamespace(namespace), client.PropagationPolicy(metav1.DeletePropagationBackground))
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		return len(listPipelineRuns(namespace)) == 0
+	}, 10*time.Second, 100*time.Millisecond).Should(BeTrue())
 }
 
 func deleteJobs(namespace string) {

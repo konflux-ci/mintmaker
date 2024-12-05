@@ -19,54 +19,94 @@ package controller
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"time"
 
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	. "github.com/konflux-ci/mintmaker/pkg/common"
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+)
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
-
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
-	. "github.com/konflux-ci/mintmaker/pkg/common"
-	"github.com/konflux-ci/mintmaker/pkg/git"
-	"github.com/konflux-ci/mintmaker/pkg/k8s"
-	"github.com/konflux-ci/mintmaker/pkg/renovate"
+const (
+	RenovateImageEnvName    = "RENOVATE_IMAGE"
+	DefaultRenovateImageUrl = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
 )
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
-	client         client.Client
-	taskProviders  []renovate.TaskProvider
-	eventRecorder  record.EventRecorder
-	jobCoordinator *renovate.JobCoordinator
+	Client client.Client
+	Scheme *runtime.Scheme
 }
 
 func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
-		client: client,
-		taskProviders: []renovate.TaskProvider{
-			renovate.NewGithubAppRenovaterTaskProvider(k8s.NewGithubAppConfigReader(client, scheme, eventRecorder)),
-			renovate.NewBasicAuthTaskProvider(k8s.NewGitCredentialProvider(client)),
-		},
-		eventRecorder:  eventRecorder,
-		jobCoordinator: renovate.NewJobCoordinator(client, scheme),
+		Client: client,
+		Scheme: scheme,
 	}
 }
 
-//+kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/finalizers,verbs=update
+// createPipelineRun creates and returns a new PipelineRun
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context) (*tektonv1.PipelineRun, error) {
+
+	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
+	ctx = ctrllog.IntoContext(ctx, log)
+	timestamp := time.Now().Unix()
+	name := fmt.Sprintf("renovate-pipelinerun-%d-%s", timestamp, RandomString(5))
+
+	// Creating the pipelineRun definition
+	pipelineRun := &tektonv1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: MintMakerNamespaceName,
+		},
+		Spec: tektonv1.PipelineRunSpec{
+			Status: tektonv1.PipelineRunSpecStatusPending,
+			PipelineSpec: &tektonv1.PipelineSpec{
+				Tasks: []tektonv1.PipelineTask{
+					{
+						Name: "build",
+						TaskSpec: &tektonv1.EmbeddedTask{
+							TaskSpec: tektonv1.TaskSpec{
+								Steps: []tektonv1.Step{
+									{
+										Name:  "renovate",
+										Image: DefaultRenovateImageUrl,
+										Script: `
+	                                    echo "Running Renovate"
+	                                    sleep 10
+	                                `,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := r.Client.Create(ctx, pipelineRun); err != nil {
+		return nil, err
+	}
+
+	return pipelineRun, nil
+}
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
 
@@ -76,7 +116,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	dependencyupdatecheck := &mmv1alpha1.DependencyUpdateCheck{}
-	err := r.client.Get(ctx, req.NamespacedName, dependencyupdatecheck)
+	err := r.Client.Get(ctx, req.NamespacedName, dependencyupdatecheck)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -96,99 +136,33 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 	dependencyupdatecheck.Annotations[MintMakerProcessedAnnotationName] = "true"
 
-	err = r.client.Update(ctx, dependencyupdatecheck)
+	patch := client.MergeFrom(dependencyupdatecheck.DeepCopy())
+	err = r.Client.Patch(ctx, dependencyupdatecheck, patch)
 	if err != nil {
 		log.Error(err, "failed to update DependencyUpdateCheck annotations")
 		return ctrl.Result{}, nil
 	}
 
-	var gatheredComponents []appstudiov1alpha1.Component
-	if len(dependencyupdatecheck.Spec.Workspaces) > 0 {
-		log.Info(fmt.Sprintf("Following components are specified: %v", dependencyupdatecheck.Spec.Workspaces))
-		gatheredComponents, err = getFilteredComponents(dependencyupdatecheck.Spec.Workspaces, r.client, ctx)
-		if err != nil {
-			log.Error(err, "gathering filtered components has failed")
-			return ctrl.Result{}, err
-		}
-	} else {
-		allComponents := &appstudiov1alpha1.ComponentList{}
-		if err := r.client.List(ctx, allComponents, &client.ListOptions{}); err != nil {
-			log.Error(err, "failed to list Components")
-			return ctrl.Result{}, err
-		}
-		gatheredComponents = allComponents.Items
-
-	}
-
-	log.Info(fmt.Sprintf("%v components will be processed", len(gatheredComponents)))
-
-	// Filter out components which have mintmaker disabled
-	componentList := []appstudiov1alpha1.Component{}
-	for _, component := range gatheredComponents {
-		if value, exists := component.Annotations[MintMakerDisabledAnnotationName]; !exists || value != "true" {
-			componentList = append(componentList, component)
-		}
-	}
-
-	log.Info("found components with mintmaker disabled", "components", len(gatheredComponents)-len(componentList))
-	if len(componentList) == 0 {
-		return ctrl.Result{}, nil
-	}
-
-	var scmComponents []*git.ScmComponent
-	for _, component := range componentList {
-		gitProvider, err := getGitProvider(component)
-		if err != nil {
-			// component misconfiguration shouldn't prevent other components from being updated
-			// deepcopy the component to avoid implicit memory aliasing in for loop
-			r.eventRecorder.Event(component.DeepCopy(), "Warning", "ErrorComponentProviderInfo", err.Error())
-			continue
-		}
-
-		scmComponent, err := git.NewScmComponent(gitProvider, component.Spec.Source.GitSource.URL, component.Spec.Source.GitSource.Revision, component.Name, component.Namespace)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		scmComponents = append(scmComponents, scmComponent)
-	}
-	var tasks []*renovate.Task
-	for _, taskProvider := range r.taskProviders {
-		newTasks := taskProvider.GetNewTasks(ctx, scmComponents)
-		log.Info("found new tasks", "tasks", len(newTasks), "provider", reflect.TypeOf(taskProvider).String())
-		if len(newTasks) > 0 {
-			tasks = append(tasks, newTasks...)
-		}
-	}
-
-	if len(tasks) == 0 {
-		return ctrl.Result{}, nil
-	}
-
-	log.Info("executing renovate tasks", "tasks", len(tasks))
-	err = r.jobCoordinator.ExecuteWithLimits(ctx, tasks)
+	log.Info("Creating pending PipelineRun")
+	pipelinerun, err := r.createPipelineRun(ctx)
 	if err != nil {
-		log.Error(err, "failed to create a job")
+		log.Error(err, "failed to create PipelineRun")
+	} else {
+		log.Info(fmt.Sprintf("Created PipelineRun %s", pipelinerun.Name))
 	}
-
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DependencyUpdateCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// we are monitoring the creation of DependencyUpdateCheck
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mmv1alpha1.DependencyUpdateCheck{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(e event.CreateEvent) bool {
-				return true
-			},
-			DeleteFunc: func(event.DeleteEvent) bool {
-				return false
-			},
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				return false
-			},
-			GenericFunc: func(event.GenericEvent) bool {
-				return false
-			},
-		})).
+		For(&mmv1alpha1.DependencyUpdateCheck{}).
+		WithEventFilter(predicate.Funcs{
+			CreateFunc:  func(createEvent event.CreateEvent) bool { return true },
+			DeleteFunc:  func(deleteEvent event.DeleteEvent) bool { return false },
+			UpdateFunc:  func(updateEvent event.UpdateEvent) bool { return false },
+			GenericFunc: func(genericEvent event.GenericEvent) bool { return false },
+		}).
 		Complete(r)
 }
