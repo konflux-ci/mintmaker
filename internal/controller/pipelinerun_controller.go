@@ -23,7 +23,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,21 +60,23 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	var pipelineRuns tektonv1beta1.PipelineRun
-	err := r.Client.Get(ctx, req.NamespacedName, &pipelineRuns)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Error(err, "Unable to fetch PipelineRun")
-			return ctrl.Result{}, err
-		}
-	}
+	// FIXME remove this block? seems it isn't doing anything
+	// var pipelineRuns tektonv1beta1.PipelineRun
+	// err := r.Client.Get(ctx, req.NamespacedName, &pipelineRuns)
+	// if err != nil {
+	// 	if errors.IsNotFound(err) {
+	// 		log.Error(err, "Unable to fetch PipelineRun")
+	// 		return ctrl.Result{}, err
+	// 	}
+	// }
 
-	log.Info(fmt.Sprintf("pipelineRuns: %v", pipelineRuns)) //FIXME debug, remove after done
-	log.Info("\n\n[spew]")
-	log.Info(spew.Sdump(pipelineRuns)) //FIXME debug, remove after done
+	// log.Info(fmt.Sprintf("pipelineRuns: %v", pipelineRuns)) //FIXME debug, remove after done
+	// log.Info("\n\n[spew]")
+	// log.Info(spew.Sdump(pipelineRuns)) //FIXME debug, remove after done
 
+	// var childPipelineRuns tektonv1.PipelineRunList
 	var childPipelineRuns tektonv1beta1.PipelineRunList
-	err = r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
+	err := r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
 	if err != nil {
 		log.Error(err, "Unable to list child pipelineruns")
 		return ctrl.Result{}, err
@@ -85,9 +86,10 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log.Info("\n\n[spew]")
 	log.Info(spew.Sdump(childPipelineRuns)) //FIXME debug, remove after done
 
+	// var runningPipelineRuns []*tektonv1.PipelineRun
 	var runningPipelineRuns []*tektonv1beta1.PipelineRun
 	for i, pipelineRun := range childPipelineRuns.Items {
-		if pipelineRun.IsPending() {
+		if pipelineRun.IsPending() { //FIXME should be running, not pending
 			runningPipelineRuns = append(runningPipelineRuns, &childPipelineRuns.Items[i])
 		}
 	}
@@ -100,7 +102,14 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if pipelineRun.IsPending() {
 				log.Info(fmt.Sprintf("\n\nPipelineRun before update: %v", req.NamespacedName)) //FIXME remove after debug
 				pipelineRun.Spec.Status = ""                                                   // FIXME did not work!
+				// pipelineRun.Status = nil
+				err = r.Client.Update(ctx, &pipelineRun, &client.UpdateOptions{})
+				if err != nil {
+					log.Error(err, "Unable to update pipelinerun status")
+					return ctrl.Result{}, err
+				}
 				log.Info(fmt.Sprintf("\n\nPipelineRun is updated (pending state removed): %v", req.NamespacedName))
+				log.Info(fmt.Sprintf("\n\nPipelineRun spec status: %s", pipelineRun.Spec.Status))
 			}
 		}
 	}
@@ -117,8 +126,8 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		and one of these events will have to return true, and the reconcile can be stuff
 		based on the event */
 		WithEventFilter(predicate.Funcs{
-			CreateFunc:  func(createEvent event.CreateEvent) bool { return false },
-			DeleteFunc:  func(deleteEvent event.DeleteEvent) bool { return false },
+			CreateFunc:  func(createEvent event.CreateEvent) bool { return true },
+			DeleteFunc:  func(deleteEvent event.DeleteEvent) bool { return true },
 			UpdateFunc:  func(updateEvent event.UpdateEvent) bool { return true },
 			GenericFunc: func(genericEvent event.GenericEvent) bool { return false },
 		}).
