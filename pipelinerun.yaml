@@ -12,5 +12,5 @@ spec:
           steps:
             - name: run
               image: “alpine”
-              command: ["sleep 10"]
+              command: ["sleep 300"]
 

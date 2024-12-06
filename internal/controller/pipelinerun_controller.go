@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -41,6 +42,22 @@ type PipelineRunReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+type ConditionAccessorFn func(ca apis.ConditionAccessor) (bool, error)
+
+func Running(name string) ConditionAccessorFn {
+	return func(ca apis.ConditionAccessor) (bool, error) {
+		c := ca.GetCondition(apis.ConditionSucceeded)
+		if c != nil {
+			if c.Status == corev1.ConditionTrue || c.Status == corev1.ConditionFalse {
+				return true, fmt.Errorf(`%q already finished`, name)
+			} else if c.Status == corev1.ConditionUnknown && (c.Reason == "Running" || c.Reason == "Pending") {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -54,27 +71,10 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log := ctrllog.FromContext(ctx).WithName("PipelineRun")
 	ctx = ctrllog.IntoContext(ctx, log)
 
-	log.Info("hello from PipelineRunReconciler.Reconcile") //FIXME debug, remove after done
-
 	if req.Namespace != MintMakerNamespaceName {
 		return ctrl.Result{}, nil
 	}
 
-	// FIXME remove this block? seems it isn't doing anything
-	// var pipelineRuns tektonv1beta1.PipelineRun
-	// err := r.Client.Get(ctx, req.NamespacedName, &pipelineRuns)
-	// if err != nil {
-	// 	if errors.IsNotFound(err) {
-	// 		log.Error(err, "Unable to fetch PipelineRun")
-	// 		return ctrl.Result{}, err
-	// 	}
-	// }
-
-	// log.Info(fmt.Sprintf("pipelineRuns: %v", pipelineRuns)) //FIXME debug, remove after done
-	// log.Info("\n\n[spew]")
-	// log.Info(spew.Sdump(pipelineRuns)) //FIXME debug, remove after done
-
-	// var childPipelineRuns tektonv1.PipelineRunList
 	var childPipelineRuns tektonv1beta1.PipelineRunList
 	err := r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
 	if err != nil {
@@ -82,15 +82,17 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	log.Info(fmt.Sprintf("childPipelineRuns: %v", childPipelineRuns)) //FIXME debug, remove after done
-	log.Info("\n\n[spew]")
-	log.Info(spew.Sdump(childPipelineRuns)) //FIXME debug, remove after done
-
-	// var runningPipelineRuns []*tektonv1.PipelineRun
 	var runningPipelineRuns []*tektonv1beta1.PipelineRun
 	for i, pipelineRun := range childPipelineRuns.Items {
-		if pipelineRun.IsPending() { //FIXME should be running, not pending
+
+		if pipelineRun.Status.Conditions[0].Status == corev1.ConditionUnknown &&
+			(pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonRunning.String() ||
+				pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonStarted.String()) {
 			runningPipelineRuns = append(runningPipelineRuns, &childPipelineRuns.Items[i])
+		}
+
+		if pipelineRun.Status.Conditions[0].Status == corev1.ConditionFalse {
+			log.Info("yabadabadoo")
 		}
 	}
 	numRunning := len(runningPipelineRuns)
@@ -100,16 +102,13 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if numRunning < MaxSimultaneousPipelineRuns {
 		for _, pipelineRun := range childPipelineRuns.Items {
 			if pipelineRun.IsPending() {
-				log.Info(fmt.Sprintf("\n\nPipelineRun before update: %v", req.NamespacedName)) //FIXME remove after debug
-				pipelineRun.Spec.Status = ""                                                   // FIXME did not work!
-				// pipelineRun.Status = nil
+				pipelineRun.Spec.Status = ""
 				err = r.Client.Update(ctx, &pipelineRun, &client.UpdateOptions{})
 				if err != nil {
 					log.Error(err, "Unable to update pipelinerun status")
 					return ctrl.Result{}, err
 				}
 				log.Info(fmt.Sprintf("\n\nPipelineRun is updated (pending state removed): %v", req.NamespacedName))
-				log.Info(fmt.Sprintf("\n\nPipelineRun spec status: %s", pipelineRun.Spec.Status))
 			}
 		}
 	}
