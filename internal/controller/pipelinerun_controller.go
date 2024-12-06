@@ -24,7 +24,6 @@ import (
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -40,22 +39,6 @@ const (
 type PipelineRunReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
-}
-
-type ConditionAccessorFn func(ca apis.ConditionAccessor) (bool, error)
-
-func Running(name string) ConditionAccessorFn {
-	return func(ca apis.ConditionAccessor) (bool, error) {
-		c := ca.GetCondition(apis.ConditionSucceeded)
-		if c != nil {
-			if c.Status == corev1.ConditionTrue || c.Status == corev1.ConditionFalse {
-				return true, fmt.Errorf(`%q already finished`, name)
-			} else if c.Status == corev1.ConditionUnknown && (c.Reason == "Running" || c.Reason == "Pending") {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -75,6 +58,7 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	// Get pipelineruns
 	var childPipelineRuns tektonv1beta1.PipelineRunList
 	err := r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
 	if err != nil {
@@ -82,23 +66,19 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
+	// Collect pipelineruns with state 'running' or 'started'
 	var runningPipelineRuns []*tektonv1beta1.PipelineRun
 	for i, pipelineRun := range childPipelineRuns.Items {
-
-		if pipelineRun.Status.Conditions[0].Status == corev1.ConditionUnknown &&
+		if len(pipelineRun.Status.Conditions) > 0 &&
+			pipelineRun.Status.Conditions[0].Status == corev1.ConditionUnknown &&
 			(pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonRunning.String() ||
 				pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonStarted.String()) {
 			runningPipelineRuns = append(runningPipelineRuns, &childPipelineRuns.Items[i])
 		}
-
-		if pipelineRun.Status.Conditions[0].Status == corev1.ConditionFalse {
-			log.Info("yabadabadoo")
-		}
 	}
 	numRunning := len(runningPipelineRuns)
 
-	log.Info("running pipelineRuns count", "numRunning", numRunning)
-
+	// Launch one pipelinerun if less than the maximum number is currently running
 	if numRunning < MaxSimultaneousPipelineRuns {
 		for _, pipelineRun := range childPipelineRuns.Items {
 			if pipelineRun.IsPending() {
