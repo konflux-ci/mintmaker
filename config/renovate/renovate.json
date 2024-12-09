@@ -57,7 +57,9 @@
     "poetry",
     "pyenv",
     "runtime-version",
-    "setup-cfg"
+    "setup-cfg",
+    "gomod",
+    "ocb"
   ],
   "tekton": {
     "additionalBranchPrefix": "",
@@ -94,6 +96,15 @@
         "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
         "recreateWhen": "always",
         "rebaseWhen": "behind-base-branch"
+      },
+      {
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchDepTypes": [
+          "indirect"
+        ],
+        "enabled": true
       }
     ],
     "schedule": [
@@ -306,6 +317,20 @@
   "setup-cfg": {
     "schedule": [
       "after 5am on saturday"
+    ]
+  },
+  "gomod": {
+    "schedule": [
+      "after 5am on sunday"
+    ],
+    "postUpdateOptions": [
+      "gomodUpdateImportPaths",
+      "gomodTidy"
+    ]
+  },
+  "ocb": {
+    "schedule": [
+      "after 5am on sunday"
     ]
   },
   "forkProcessing": "enabled",
