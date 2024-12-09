@@ -23,7 +23,7 @@ import (
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
-	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +54,7 @@ func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Sc
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context) (*tektonv1beta1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
@@ -62,20 +62,20 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context)
 	name := fmt.Sprintf("renovate-pipelinerun-%d-%s", timestamp, RandomString(5))
 
 	// Creating the pipelineRun definition
-	pipelineRun := &tektonv1.PipelineRun{
+	pipelineRun := &tektonv1beta1.PipelineRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: MintMakerNamespaceName,
 		},
-		Spec: tektonv1.PipelineRunSpec{
-			Status: tektonv1.PipelineRunSpecStatusPending,
-			PipelineSpec: &tektonv1.PipelineSpec{
-				Tasks: []tektonv1.PipelineTask{
+		Spec: tektonv1beta1.PipelineRunSpec{
+			Status: tektonv1beta1.PipelineRunSpecStatusPending,
+			PipelineSpec: &tektonv1beta1.PipelineSpec{
+				Tasks: []tektonv1beta1.PipelineTask{
 					{
 						Name: "build",
-						TaskSpec: &tektonv1.EmbeddedTask{
-							TaskSpec: tektonv1.TaskSpec{
-								Steps: []tektonv1.Step{
+						TaskSpec: &tektonv1beta1.EmbeddedTask{
+							TaskSpec: tektonv1beta1.TaskSpec{
+								Steps: []tektonv1beta1.Step{
 									{
 										Name:  "renovate",
 										Image: DefaultRenovateImageUrl,
@@ -97,6 +97,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context)
 		return nil, err
 	}
 
+	log.Info(fmt.Sprintf("Created pipelinerun %s", name))
 	return pipelineRun, nil
 }
 
@@ -142,12 +143,12 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("Creating pending PipelineRun")
+	log.Info("Creating pending pipeline runs")
 	pipelinerun, err := r.createPipelineRun(ctx)
 	if err != nil {
-		log.Error(err, "failed to create PipelineRun")
+		log.Error(err, "failed to create pipelineruns")
 	} else {
-		log.Info(fmt.Sprintf("Created PipelineRun %s", pipelinerun.Name))
+		log.Info(fmt.Sprintf("Created pipelinerun %v", pipelinerun))
 	}
 	return ctrl.Result{}, nil
 }

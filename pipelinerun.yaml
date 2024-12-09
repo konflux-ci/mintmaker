@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: "pplnr-example"
+  namespace: mintmaker
+spec:
+  status: "PipelineRunPending"
+  pipelineSpec:
+    tasks:
+      - name: run-renovate
+        taskSpec:
+          steps:
+            - name: run
+              image: “alpine”
+              command: ["sleep 300"]
+

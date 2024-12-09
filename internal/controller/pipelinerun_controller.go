@@ -21,7 +21,8 @@ import (
 	"fmt"
 
 	. "github.com/konflux-ci/mintmaker/pkg/common"
-	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,9 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	MaxSimultaneousPipelineRuns = 20
+)
+
 // PipelineRunReconciler reconciles a PipelineRun object
 type PipelineRunReconciler struct {
-	client.Client
+	Client client.Client
 	Scheme *runtime.Scheme
 }
 
@@ -53,7 +58,40 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	log.Info(fmt.Sprintf("PipelineRun is updated: %v", req.NamespacedName))
+	// Get pipelineruns
+	var childPipelineRuns tektonv1beta1.PipelineRunList
+	err := r.Client.List(ctx, &childPipelineRuns, client.InNamespace(req.Namespace))
+	if err != nil {
+		log.Error(err, "Unable to list child pipelineruns")
+		return ctrl.Result{}, err
+	}
+
+	// Collect pipelineruns with state 'running' or 'started'
+	var runningPipelineRuns []*tektonv1beta1.PipelineRun
+	for i, pipelineRun := range childPipelineRuns.Items {
+		if len(pipelineRun.Status.Conditions) > 0 &&
+			pipelineRun.Status.Conditions[0].Status == corev1.ConditionUnknown &&
+			(pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonRunning.String() ||
+				pipelineRun.Status.Conditions[0].Reason == tektonv1beta1.PipelineRunReasonStarted.String()) {
+			runningPipelineRuns = append(runningPipelineRuns, &childPipelineRuns.Items[i])
+		}
+	}
+	numRunning := len(runningPipelineRuns)
+
+	// Launch one pipelinerun if less than the maximum number is currently running
+	if numRunning < MaxSimultaneousPipelineRuns {
+		for _, pipelineRun := range childPipelineRuns.Items {
+			if pipelineRun.IsPending() {
+				pipelineRun.Spec.Status = ""
+				err = r.Client.Update(ctx, &pipelineRun, &client.UpdateOptions{})
+				if err != nil {
+					log.Error(err, "Unable to update pipelinerun status")
+					return ctrl.Result{}, err
+				}
+				log.Info(fmt.Sprintf("\n\nPipelineRun is updated (pending state removed): %v", req.NamespacedName))
+			}
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -61,14 +99,14 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&tektonv1.PipelineRun{}).
+		For(&tektonv1beta1.PipelineRun{}).
 		/* TODO: For the time being we just ignore all types of events
 		In a second implementation we are going to listen to changes in the pipelinerun
 		and one of these events will have to return true, and the reconcile can be stuff
 		based on the event */
 		WithEventFilter(predicate.Funcs{
-			CreateFunc:  func(createEvent event.CreateEvent) bool { return false },
-			DeleteFunc:  func(deleteEvent event.DeleteEvent) bool { return false },
+			CreateFunc:  func(createEvent event.CreateEvent) bool { return true },
+			DeleteFunc:  func(deleteEvent event.DeleteEvent) bool { return true },
 			UpdateFunc:  func(updateEvent event.UpdateEvent) bool { return true },
 			GenericFunc: func(genericEvent event.GenericEvent) bool { return false },
 		}).
