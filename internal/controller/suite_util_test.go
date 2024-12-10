@@ -24,7 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -323,9 +323,17 @@ func deleteDependencyUpdateCheck(resourceKey types.NamespacedName) {
 		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, dependencyUpdateCheck))
 	}, timeout, interval).Should(BeTrue())
 }
+func listPipelineRuns(namespace string) []tektonv1beta1.PipelineRun {
+	// Use kubeconfig from the default location
+	//kubeconfig := flag.String("kubeconfig", "/home/user/.kube/config", "location to your kubeconfig file")
+	//flag.Parse()
 
-func listPipelineRuns(namespace string) []tektonv1.PipelineRun {
-	pipelineruns := &tektonv1.PipelineRunList{}
+	//// Create a kubeconfig client
+	//config, _ := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	//// Create Tekton client
+	//tektonClient, _ := versioned.NewForConfig(config)
+	//pipelineruns, err := tektonClient.TektonV1beta1().PipelineRuns(namespace).List(ctx, metav1.ListOptions{})
+	pipelineruns := &tektonv1beta1.PipelineRunList{}
 
 	err := k8sClient.List(ctx, pipelineruns, client.InNamespace(namespace))
 	Expect(err).ToNot(HaveOccurred())
