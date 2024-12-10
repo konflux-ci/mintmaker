@@ -4,5 +4,15 @@
     "automergeType": "pr",
     "automerge": true,
     "platformAutomerge": true
+  },
+  "dockerfile": {
+    "packageRules": [
+      {
+        "packageNames": [
+          "registry.access.redhat.com/ubi9/go-toolset"
+        ],
+        "allowedVersions": "<=1.21"
+      }
+    ]
   }
 }
