@@ -3,6 +3,8 @@ package git
 import (
 	"net/url"
 	"strings"
+
+	gp "github.com/konflux-ci/mintmaker/pkg/git/gitprovider"
 )
 
 const InternalDefaultBranch = "$DEFAULTBRANCH"
@@ -16,7 +18,7 @@ type ScmComponent struct {
 }
 
 func NewScmComponent(platform string, repositoryUrl string, revision string, componentName string, namespaceName string) (*ScmComponent, error) {
-	url, err := url.Parse(strings.TrimSuffix(strings.TrimSuffix(repositoryUrl, ".git"), "/"))
+	url, err := gp.ParseGitURL(repositoryUrl)
 	if err != nil {
 		return nil, err
 	}

@@ -19,11 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	gp "github.com/konflux-ci/mintmaker/pkg/git/gitprovider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,30 +40,15 @@ func getGitProvider(component appstudiov1alpha1.Component) (string, error) {
 		err := fmt.Errorf("git source URL is not set for %s Component in %s namespace", component.Name, component.Namespace)
 		return "", err
 	}
-	sourceUrl := component.Spec.Source.GitSource.URL
 
-	if strings.HasPrefix(sourceUrl, "git@") {
-		// git@github.com:redhat-appstudio/application-service.git
-		sourceUrl = strings.TrimPrefix(sourceUrl, "git@")
-		host := strings.Split(sourceUrl, ":")[0]
-		gitProvider = strings.Split(host, ".")[0]
-	} else {
-		// https://github.com/redhat-appstudio/application-service
-		u, err := url.Parse(sourceUrl)
-		if err != nil {
-			return "", err
-		}
-		uParts := strings.Split(u.Hostname(), ".")
-		if len(uParts) == 1 {
-			gitProvider = uParts[0]
-		} else {
-			gitProvider = uParts[len(uParts)-2]
-		}
+	// If possible, parse git provider from the repository URL
+	sourceUrl, err := gp.ParseGitURL(component.Spec.Source.GitSource.URL)
+	if err == nil {
+		gitProvider = strings.Split(sourceUrl.Hostname(), ".")[0]
 	}
 
-	var err error
+	// Self-hosted git provider, check for git-provider annotation on the component
 	if !allowedGitProviders[gitProvider] {
-		// Self-hosted git provider, check for git-provider annotation on the component
 		gitProviderAnnotationValue := component.GetAnnotations()[GitProviderAnnotationName]
 		if gitProviderAnnotationValue != "" {
 			if allowedGitProviders[gitProviderAnnotationValue] {

@@ -16,7 +16,11 @@ limitations under the License.
 
 package gitprovider
 
-import "os"
+import (
+	"net/url"
+	"os"
+	"strings"
+)
 
 const (
 	PipelinesAsCodeWebhhokInsecureSslEnvVar = "PAC_WEBHOOK_INSECURE_SSL"
@@ -32,4 +36,20 @@ func IsInsecureSSL() bool {
 		}
 	}
 	return false
+}
+
+func ParseGitURL(gitUrl string) (*url.URL, error) {
+	gitUrl = strings.TrimSuffix(strings.TrimSuffix(gitUrl, ".git"), "/")
+
+	if strings.HasPrefix(gitUrl, "git@") {
+		gitUrl = strings.Replace(gitUrl, ":", "/", 1)
+		gitUrl = strings.Replace(gitUrl, "git@", "https://", 1)
+	}
+
+	parsedUrl, err := url.Parse(gitUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsedUrl, nil
 }
