@@ -342,7 +342,7 @@ func (j *JobCoordinator) Execute(ctx context.Context, tasks []*Task) error {
 		}
 		registrySecretMount := corev1.VolumeMount{
 			Name:      "registry-secrets",
-			MountPath: "/.docker",
+			MountPath: "/home/renovate/.docker",
 			ReadOnly:  true,
 		}
 		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, registrySecretVolume)
