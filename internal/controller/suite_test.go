@@ -101,6 +101,9 @@ var _ = BeforeSuite(func() {
 	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"))).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&PipelineRunReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
