@@ -8,6 +8,7 @@ import (
 	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	gitlab "github.com/konflux-ci/mintmaker/internal/pkg/component/gitlab"
 	utils "github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -23,7 +24,7 @@ type GitComponent interface {
 	GetToken() (string, error)
 	GetBranch() (string, error)
 	GetAPIEndpoint() string
-	GetRenovateConfig() (string, error)
+	GetRenovateConfig(*corev1.Secret) (string, error)
 }
 
 func NewGitComponent(comp *appstudiov1alpha1.Component, timestamp int64, client client.Client, ctx context.Context) (GitComponent, error) {

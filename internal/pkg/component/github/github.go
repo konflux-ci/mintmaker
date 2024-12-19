@@ -22,10 +22,10 @@ import (
 //TODO: doc about only supporting GitHub with the installed GitHub App
 
 var (
-	ghAppInstallationsCache          *Cache
+	ghAppInstallationsCache          *base.Cache
 	ghAppInstallationsCacheMutex     sync.Mutex
 	ghAppInstallationsCacheID        int64
-	ghAppInstallationTokenCache      *Cache
+	ghAppInstallationTokenCache      *base.Cache
 	ghAppInstallationTokenCacheMutex sync.Mutex
 	ghAppInstallationTokenCacheID    int64
 	ghAppID                          int64
@@ -123,7 +123,7 @@ func (c *Component) GetToken() (string, error) {
 	defer ghAppInstallationTokenCacheMutex.Unlock()
 
 	if ghAppInstallationTokenCache == nil || ghAppInstallationTokenCacheID != c.Timestamp {
-		ghAppInstallationTokenCache = NewCache()
+		ghAppInstallationTokenCache = base.NewCache()
 		ghAppInstallationTokenCacheID = c.Timestamp
 	}
 
@@ -180,7 +180,7 @@ func (c *Component) getAppInstallations() ([]AppInstallation, error) {
 	defer ghAppInstallationsCacheMutex.Unlock()
 
 	if ghAppInstallationsCache == nil || ghAppInstallationsCacheID != c.Timestamp {
-		ghAppInstallationsCache = NewCache()
+		ghAppInstallationsCache = base.NewCache()
 		ghAppInstallationsCacheID = c.Timestamp
 	}
 	if data, ok := ghAppInstallationsCache.Get("installations"); ok {
@@ -281,8 +281,8 @@ func (c *Component) getAppSlug() (string, error) {
 	return slug, nil
 }
 
-func (c *Component) GetRenovateConfig() (string, error) {
-	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx)
+func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx, registrySecret)
 	if err != nil {
 		return "", err
 	}

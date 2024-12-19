@@ -173,8 +173,8 @@ func (c *Component) getDefaultBranch() (string, error) {
 	return "main", nil
 }
 
-func (c *Component) GetRenovateConfig() (string, error) {
-	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx)
+func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx, registrySecret)
 	if err != nil {
 		return "", err
 	}
