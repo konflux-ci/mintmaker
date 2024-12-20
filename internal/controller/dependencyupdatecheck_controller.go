@@ -18,12 +18,15 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	component "github.com/konflux-ci/mintmaker/internal/pkg/component"
+	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
 	utils "github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -34,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -42,6 +46,11 @@ import (
 const (
 	RenovateImageEnvName    = "RENOVATE_IMAGE"
 	DefaultRenovateImageUrl = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
+)
+
+var (
+	registrySecretCache      *base.Cache
+	registrySecretCacheMutex sync.Mutex
 )
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
@@ -80,14 +89,102 @@ func (r *DependencyUpdateCheckReconciler) getCAConfigMap(ctx context.Context) (*
 	return nil, nil
 }
 
+// Create a secret that merges all secret with the label:
+// mintmaker.appstudio.redhat.com/secret-type: registry
+// and return the new secret
+func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Context) (*corev1.Secret, error) {
+	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
+	ctx = ctrllog.IntoContext(ctx, log)
+
+	secretList := &corev1.SecretList{}
+	labelSelector := client.MatchingLabels{"mintmaker.appstudio.redhat.com/secret-type": "registry"}
+	listOptions := []client.ListOption{
+		client.InNamespace(MintMakerNamespaceName),
+		labelSelector,
+	}
+
+	err := r.Client.List(ctx, secretList, listOptions...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(secretList.Items) == 0 {
+		// No secrets to merge
+		return nil, nil
+	}
+
+	log.Info(fmt.Sprintf("Found %d secrets to merge", len(secretList.Items)))
+
+	mergedAuths := make(map[string]interface{})
+	for _, secret := range secretList.Items {
+		if secret.Type == corev1.SecretTypeDockerConfigJson {
+			data, exists := secret.Data[".dockerconfigjson"]
+			if !exists {
+				// No .dockerconfigjson section
+				log.Info("Found secret without .dockerconfigjson section")
+				return nil, nil
+			}
+
+			var dockerConfig map[string]interface{}
+			if err := json.Unmarshal(data, &dockerConfig); err != nil {
+				return nil, err
+			}
+
+			auths, exists := dockerConfig["auths"].(map[string]interface{})
+			if !exists {
+				continue
+			}
+
+			for registry, creds := range auths {
+				mergedAuths[registry] = creds
+			}
+		}
+	}
+
+	mergedDockerConfig := map[string]interface{}{
+		"auths": mergedAuths,
+	}
+
+	if len(mergedAuths) == 0 {
+		log.Info("Merged auths empty, skipping creation of secret")
+		return nil, nil
+	}
+
+	mergedConfigJson, err := json.Marshal(mergedDockerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	timestamp := time.Now().Unix()
+	name := fmt.Sprintf("renovate-image-pull-secrets-%d-%s", timestamp, RandomString(5))
+
+	newSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: MintMakerNamespaceName,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(mergedConfigJson),
+		},
+	}
+
+	if err := r.Client.Create(ctx, newSecret); err != nil {
+		return nil, err
+	}
+
+	return newSecret, nil
+}
+
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitComponent, ctx context.Context) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitComponent, ctx context.Context, registry_secret *corev1.Secret) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
 	name := fmt.Sprintf("renovate-%d-%s-%s", comp.GetTimestamp(), RandomString(8), comp.GetName())
 
-	renovateConfig, err := comp.GetRenovateConfig()
+	renovateConfig, err := comp.GetRenovateConfig(registry_secret)
 	if err != nil {
 		return nil, err
 	}
@@ -171,12 +268,30 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		builder.WithConfigMap("trusted-ca", "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
+	if registry_secret != nil {
+		secretItems := []corev1.KeyToPath{
+			{
+				Key:  ".dockerconfigjson",
+				Path: "config.json",
+			},
+		}
+		secretOpts := utils.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
+		builder.WithSecret("registry-secrets", "/.docker", secretItems, secretOpts)
+	}
+
 	pipelineRun, err := builder.Build()
 	if err != nil {
 		log.Error(err, "failed to build pipeline definition")
 		return nil, err
 	}
 	if err := r.Client.Create(ctx, pipelineRun); err != nil {
+		return nil, err
+	}
+
+	if err := controllerutil.SetOwnerReference(pipelineRun, registry_secret, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err := r.Client.Update(ctx, registry_secret); err != nil {
 		return nil, err
 	}
 
@@ -258,6 +373,25 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
+	registrySecretCacheMutex.Lock()
+	defer registrySecretCacheMutex.Unlock()
+
+	if registrySecretCache == nil {
+		registrySecretCache = base.NewCache()
+	}
+
+	// let's try to get the secret, if it's there
+	var registry_secret *corev1.Secret
+	token_key := fmt.Sprintf("registry_secret")
+	if token, ok := registrySecretCache.Get(token_key); ok {
+		registry_secret = token.(*corev1.Secret)
+	} else {
+		// creating registry secret for private registries
+		// this will be the same for all the PipelineRuns
+		registry_secret, _ := r.createMergedPullSecret(ctx)
+		registrySecretCache.Set(token_key, registry_secret)
+	}
+
 	timestamp := time.Now().UTC().Unix()
 	for _, appstudioComponent := range componentList {
 		comp, err := component.NewGitComponent(&appstudioComponent, timestamp, r.Client, ctx)
@@ -266,7 +400,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			continue
 		}
 		log.Info("creating pending PipelineRun")
-		pipelinerun, err := r.createPipelineRun(comp, ctx)
+		pipelinerun, err := r.createPipelineRun(comp, ctx, registry_secret)
 		if err != nil {
 			log.Error(err, "failed to create PipelineRun")
 		} else {
