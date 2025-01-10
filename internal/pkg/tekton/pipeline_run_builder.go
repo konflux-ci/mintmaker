@@ -106,10 +106,9 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 								TaskSpec: tektonv1.TaskSpec{
 									Steps: []tektonv1.Step{
 										{
-											Name: "renovate",
-											// TODO: use default, or get from ENV
+											Name:   "renovate",
 											Image:  "quay.io/konflux-ci/mintmaker-renovate-image:latest",
-											Script: `echo "Running Renovate"; sleep 10`,
+											Script: `RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) RENOVATE_CONFIG_FILE=/etc/renovate/config/renovate.json renovate`,
 										},
 									},
 								},
