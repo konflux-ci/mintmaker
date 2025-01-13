@@ -282,14 +282,43 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		return nil, err
 	}
 
-	if err := controllerutil.SetOwnerReference(pipelineRun, registry_secret, r.Scheme); err != nil {
+	// Set ownership so all resources get deleted once the job is deleted
+	// ownership for renovateSecret
+	if err := controllerutil.SetOwnerReference(pipelineRun, renovateSecret, r.Scheme); err != nil {
 		return nil, err
 	}
-	if err := r.Client.Update(ctx, registry_secret); err != nil {
+	if err := r.Client.Update(ctx, renovateSecret); err != nil {
 		return nil, err
 	}
 
-	// TODO: set ownerReferences for renovateConfigMap and renovateSecret
+	// ownership for registry_secret
+	if registry_secret != nil {
+		if err := controllerutil.SetOwnerReference(pipelineRun, registry_secret, r.Scheme); err != nil {
+			return nil, err
+		}
+		if err := r.Client.Update(ctx, registry_secret); err != nil {
+			return nil, err
+		}
+	}
+
+	// ownership for the renovateConfigMap
+	if err := controllerutil.SetOwnerReference(pipelineRun, renovateConfigMap, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err := r.Client.Update(ctx, renovateConfigMap); err != nil {
+		return nil, err
+	}
+
+	// ownership for the caConfigMap
+	if caConfigMap != nil {
+		if err := controllerutil.SetOwnerReference(pipelineRun, caConfigMap, r.Scheme); err != nil {
+			return nil, err
+		}
+		if err := r.Client.Update(ctx, caConfigMap); err != nil {
+			return nil, err
+		}
+	}
+
 	return pipelineRun, nil
 }
 
