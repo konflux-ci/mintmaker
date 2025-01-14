@@ -18,12 +18,18 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"strconv"
+	"time"
 
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,6 +91,7 @@ func filterPipelineRunListWithLabel(pipelineRunList tektonv1.PipelineRunList, la
 
 func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existingPipelineRuns tektonv1.PipelineRunList, ctx context.Context) error {
 
+	var err error
 	log := ctrllog.FromContext(ctx).WithName("PipelineRun")
 	ctx = ctrllog.IntoContext(ctx, log)
 
@@ -95,15 +102,52 @@ func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existin
 	for _, pipelineRun := range existingPipelineRuns.Items {
 		if pipelineRun.IsPending() {
 			original := pipelineRun.DeepCopy()
+
+			// renew github secret if it is no more valid or too old
+			if pipelineRun.Labels[MintMakerAppstudioLabel] == "github" && time.Since(pipelineRun.ObjectMeta.CreationTimestamp.Time) > GhTokenUsageWindow {
+				var component appstudiov1alpha1.Component
+				var ghComponent *github.Component
+				componentName := pipelineRun.Labels["mintmaker.appstudio.redhat.com/component"]
+				componentKey := types.NamespacedName{Namespace: "mintmaker", Name: componentName}
+				err = r.Client.Get(ctx, componentKey, &component)
+				if err != nil {
+					return err
+				}
+				timestamp, err := strconv.ParseInt(component.Labels["mintmaker.appstudio.redhat.com/reconcile-timestamp"], 10, 64)
+				if err != nil {
+					return err
+				}
+				ghComponent, err = github.NewComponent(&component, timestamp, r.Client, ctx)
+				if err != nil {
+					return err
+				}
+				token, err := (*ghComponent).GetToken() // renews token
+				if err != nil {
+					return err
+				}
+				appSecret := corev1.Secret{}
+				appSecretKey := types.NamespacedName{Namespace: "mintmaker", Name: pipelineRun.Name}
+				err = r.Client.Get(ctx, appSecretKey, &appSecret)
+				if err != nil {
+					return err
+				}
+				tokenInfo := github.TokenInfo{
+					Token: token, ExpiresAt: time.Now().Add(GhTokenValidity),
+				}
+				appSecret.Data["renovate-token"] = []byte(base64.StdEncoding.EncodeToString([]byte(tokenInfo.Token)))
+			}
+
+			// set pipelinerun in motion
 			pipelineRun.Spec.Status = ""
 			patch := client.MergeFrom(original)
-			err := r.Client.Patch(ctx, &pipelineRun, patch)
+			err = r.Client.Patch(ctx, &pipelineRun, patch)
 			if err != nil {
 				log.Error(err, "Unable to update pipelinerun status")
 				return err
 			}
 			log.Info(fmt.Sprintf("PipelineRun is updated (pending state removed): %s", pipelineRun.Name))
 			numLaunched += 1
+
 			if numLaunched == numToLaunch {
 				break
 			}

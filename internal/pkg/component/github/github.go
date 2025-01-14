@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	ghinstallation "github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v45/github"
@@ -18,19 +19,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	common "github.com/konflux-ci/mintmaker/pkg/common"
 )
 
 //TODO: doc about only supporting GitHub with the installed GitHub App
 
 var (
-	ghAppInstallationsCache          *Cache
-	ghAppInstallationsCacheMutex     sync.Mutex
-	ghAppInstallationsCacheID        int64
-	ghAppInstallationTokenCache      *Cache
-	ghAppInstallationTokenCacheMutex sync.Mutex
-	ghAppInstallationTokenCacheID    int64
-	ghAppID                          int64
-	ghAppPrivateKey                  []byte
+	ghAppInstallationsCache      *Cache
+	ghAppInstallationsCacheMutex sync.Mutex
+	ghAppInstallationsCacheID    int64
+	ghAppInstallationTokenCache  TokenCache
+	ghAppID                      int64
+	ghAppPrivateKey              []byte
 )
 
 type AppInstallation struct {
@@ -118,22 +119,14 @@ func (c *Component) GetBranch() (string, error) {
 	return branch, nil
 }
 
-func (c *Component) GetToken() (string, error) {
-	ghAppInstallationTokenCacheMutex.Lock()
-	defer ghAppInstallationTokenCacheMutex.Unlock()
-
-	if ghAppInstallationTokenCache == nil || ghAppInstallationTokenCacheID != c.Timestamp {
-		ghAppInstallationTokenCache = NewCache()
-		ghAppInstallationTokenCacheID = c.Timestamp
-	}
+func (c *Component) getMyInstallationID() (int64, error) {
+	var installationID int64
+	found := false
 
 	appInstallations, err := c.getAppInstallations()
 	if err != nil {
-		return "", fmt.Errorf("failed to get GitHub App installations: %w", err)
+		return 0, err
 	}
-
-	var installationID int64
-	found := false
 
 	for _, installation := range appInstallations {
 		for _, repo := range installation.Repositories {
@@ -149,14 +142,25 @@ func (c *Component) GetToken() (string, error) {
 		}
 	}
 	if !found {
-		return "", fmt.Errorf("repository %s not found in any GitHub App installation", c.Repository)
+		return 0, fmt.Errorf("repository %s not found in any GitHub App installation", c.Repository)
+	}
+	return installationID, nil
+}
+
+func (c *Component) GetToken() (string, error) {
+
+	installationID, err := c.getMyInstallationID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get installation ID: %w", err)
 	}
 
-	token_key := fmt.Sprintf("installation_%d", installationID)
-	if token, ok := ghAppInstallationTokenCache.Get(token_key); ok {
-		return token.(string), nil
-	}
+	tokenKey := fmt.Sprintf("installation_%d", installationID)
 
+	// when token exists and within the threshold, a valid token is returned
+	if tokenInfo, ok := ghAppInstallationTokenCache.Get(tokenKey); ok {
+		return tokenInfo.Token, nil
+	}
+	// when token doesn't exist or not within the threshold, we generate a new token and update the cache
 	itr, err := ghinstallation.New(
 		http.DefaultTransport,
 		c.AppID,
@@ -166,13 +170,16 @@ func (c *Component) GetToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error creating installation transport: %w", err)
 	}
-
 	token, err := itr.Token(context.Background())
 	if err != nil {
 		return "", fmt.Errorf("error getting installation token: %w", err)
 	}
-	ghAppInstallationTokenCache.Set(token_key, token)
-	return token, nil
+	tokenInfo := TokenInfo{
+		Token: token, ExpiresAt: time.Now().Add(common.GhTokenValidity),
+	}
+	ghAppInstallationTokenCache.Set(tokenKey, tokenInfo)
+
+	return tokenInfo.Token, nil
 }
 
 func (c *Component) getAppInstallations() ([]AppInstallation, error) {
