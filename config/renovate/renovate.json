@@ -310,7 +310,8 @@
   },
   "forkProcessing": "enabled",
   "allowedPostUpgradeCommands": [
-    "^rpm-lockfile-prototype rpms.in.yaml$"
+    "^rpm-lockfile-prototype rpms.in.yaml$",
+    "^rpm-lockfile-prototype [a-zA-Z0-9_-]+/rpms.in.yaml --outfile [a-zA-Z0-9_-]+/rpms.lock.yaml$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false
