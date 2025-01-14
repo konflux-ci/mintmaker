@@ -17,13 +17,19 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"strconv"
 
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	. "github.com/konflux-ci/mintmaker/pkg/common"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,8 +39,10 @@ import (
 )
 
 var (
-	MaxSimultaneousPipelineRuns = 20
-	MintMakerAppstudioLabel     = "mintmaker.appstudio.redhat.com/platform"
+	MaxSimultaneousPipelineRuns      = 20
+	MintMakerGitPlatformLabel        = "mintmaker.appstudio.redhat.com/git-platform"
+	MintMakerReconcileTimestampLabel = "mintmaker.appstudio.redhat.com/reconcile-timestamp"
+	MintMakerComponentLabel          = "mintmaker.appstudio.redhat.com/component"
 )
 
 // Collect pipelineruns with state 'running' or 'started'
@@ -76,7 +84,7 @@ func filterPipelineRunListWithLabel(pipelineRunList tektonv1.PipelineRunList, la
 	pipelineRuns := []tektonv1.PipelineRun{}
 
 	for _, pipelineRun := range pipelineRunList.Items {
-		if pipelineRun.Labels[MintMakerAppstudioLabel] == label {
+		if pipelineRun.Labels[MintMakerGitPlatformLabel] == label {
 			pipelineRuns = append(pipelineRuns, pipelineRun)
 		}
 	}
@@ -85,6 +93,7 @@ func filterPipelineRunListWithLabel(pipelineRunList tektonv1.PipelineRunList, la
 
 func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existingPipelineRuns tektonv1.PipelineRunList, ctx context.Context) error {
 
+	var err error
 	log := ctrllog.FromContext(ctx).WithName("PipelineRun")
 	ctx = ctrllog.IntoContext(ctx, log)
 
@@ -95,21 +104,74 @@ func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existin
 	for _, pipelineRun := range existingPipelineRuns.Items {
 		if pipelineRun.IsPending() {
 			original := pipelineRun.DeepCopy()
+
+			// renew github secret if it is no more valid or too old
+			if pipelineRun.Labels[MintMakerGitPlatformLabel] == "github" {
+				var component appstudiov1alpha1.Component
+				var ghComponent *github.Component
+				componentName := pipelineRun.Labels[MintMakerComponentLabel]
+				componentKey := types.NamespacedName{Namespace: "mintmaker", Name: componentName}
+				err = r.Client.Get(ctx, componentKey, &component)
+				if err != nil {
+					log.Error(err, "Unable to update fetch konflux component, skipping")
+					continue
+				}
+				timestamp, err := strconv.ParseInt(pipelineRun.Labels[MintMakerReconcileTimestampLabel], 10, 64)
+				if err != nil {
+					log.Error(err, "Unable to parse pipelinerun timestamp, skipping")
+					continue
+				}
+				ghComponent, err = github.NewComponent(&component, timestamp, r.Client, ctx)
+				if err != nil {
+					log.Error(err, "Unable to create new github component, skipping")
+					continue
+				}
+
+				// GetToken returns the most current token to be used; itautomatically
+				// renews and returns the new token, in case the old token got old
+				token, err := (*ghComponent).GetToken()
+				if err != nil {
+					continue
+				}
+				encodedToken := []byte(base64.StdEncoding.EncodeToString([]byte(token)))
+				appSecret := corev1.Secret{}
+				appSecretKey := types.NamespacedName{Namespace: "mintmaker", Name: pipelineRun.Name}
+				err = r.Client.Get(ctx, appSecretKey, &appSecret)
+				if err != nil {
+					log.Error(err, "Unable to fetch secret app secret, skipping")
+					continue
+				}
+
+				// update the token in the secret, in case it was renewed by GetToken
+				if !bytes.Equal(appSecret.Data["renovate-token"], encodedToken) {
+					originalAppSecret := appSecret.DeepCopy()
+					appSecret.Data["renovate-token"] = encodedToken
+
+					secretPatch := client.MergeFrom(originalAppSecret)
+					err = r.Client.Patch(ctx, &appSecret, secretPatch)
+					if err != nil {
+						log.Error(err, "Unable to update github app token, skipping")
+						continue
+					}
+				}
+			}
+
+			// set pipelinerun in motion
 			pipelineRun.Spec.Status = ""
 			patch := client.MergeFrom(original)
-			err := r.Client.Patch(ctx, &pipelineRun, patch)
+			err = r.Client.Patch(ctx, &pipelineRun, patch)
 			if err != nil {
-				log.Error(err, "Unable to update pipelinerun status")
-				return err
+				log.Error(err, "Unable to update pipelinerun status, skipping to the next")
+				continue
 			}
 			log.Info(fmt.Sprintf("PipelineRun is updated (pending state removed): %s", pipelineRun.Name))
 			numLaunched += 1
+
 			if numLaunched == numToLaunch {
 				break
 			}
 		}
 	}
-
 	return nil
 }
 

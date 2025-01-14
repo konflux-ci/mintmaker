@@ -85,7 +85,7 @@ var _ = Describe("PipelineRun Controller", FlakeAttempts(3), func() {
 
 			pplrName := "pplnr1"
 			labels := make(map[string]string)
-			labels[MintMakerAppstudioLabel] = "github"
+			labels[MintMakerGitPlatformLabel] = "github"
 			pipelineRunBuilder := local_tekton.NewPipelineRunBuilder(pplrName, MintMakerNamespaceName)
 			pipelinerun, err := pipelineRunBuilder.WithLabels(labels).Build()
 			Expect(err).NotTo(HaveOccurred())
@@ -117,7 +117,7 @@ var _ = Describe("PipelineRun Controller", FlakeAttempts(3), func() {
 
 			pipelineRuns := listPipelineRuns(MintMakerNamespaceName)
 			for _, plr := range pipelineRuns {
-				if plr.Labels[MintMakerAppstudioLabel] == "github" {
+				if plr.Labels[MintMakerGitPlatformLabel] == "github" {
 					Expect(plr.Spec.Status).To(BeEmpty())
 					flag1 = true
 				} else {
