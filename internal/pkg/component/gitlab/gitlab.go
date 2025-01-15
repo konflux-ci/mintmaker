@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
 	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	"github.com/xanzy/go-gitlab"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +28,31 @@ type Component struct {
 type Repository struct {
 	BaseBranches []string
 	Repository   string
+}
+
+type FailedToParseUrlError struct {
+	url string
+	err string
+}
+
+func (e FailedToParseUrlError) Error() string {
+	return fmt.Sprintf("Failed to parse url: %s, error: %s", e.url, e.err)
+}
+
+type MissingSchemaError struct {
+	url string
+}
+
+func (e MissingSchemaError) Error() string {
+	return fmt.Sprintf("Failed to detect schema in url %s", e.url)
+}
+
+type MissingHostError struct {
+	url string
+}
+
+func (e MissingHostError) Error() string {
+	return fmt.Sprintf("Failed to detect host in url %s", e.url)
 }
 
 func NewComponent(comp *appstudiov1alpha1.Component, timestamp int64, client client.Client, ctx context.Context) (*Component, error) {
@@ -68,7 +95,6 @@ func (c *Component) GetBranch() (string, error) {
 
 	branch, err := c.getDefaultBranch()
 	if err != nil {
-		// TODO, handle the error
 		return "main", nil
 	}
 	return branch, nil
@@ -168,9 +194,55 @@ func (c *Component) GetAPIEndpoint() string {
 	return fmt.Sprintf("https://%s/api/v4/", c.Host)
 }
 
+func (c *Component) getProjectPathFromRepoUrl(repoUrl string) (string, error) {
+	url, err := url.Parse(repoUrl)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimPrefix(
+		strings.TrimSuffix(url.Path, ".git"),
+		"/",
+	), nil
+}
+
+func (c *Component) GetBaseUrl(repoUrl string) (string, error) {
+	url, err := url.Parse(repoUrl)
+	if err != nil {
+		return "", FailedToParseUrlError{url: repoUrl, err: err.Error()}
+	}
+
+	if url.Scheme == "" {
+		return "", MissingSchemaError{repoUrl}
+	}
+
+	if url.Host == "" {
+		return "", MissingHostError{repoUrl}
+	}
+
+	// The gitlab client library expects the base url to have a tailing slash
+	return fmt.Sprintf("%s://%s/", url.Scheme, url.Host), nil
+}
+
 func (c *Component) getDefaultBranch() (string, error) {
-	// TODO: call github APIs to determine the default branch
-	return "main", nil
+	token, err := c.GetToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to get GitLab token: %w", err)
+	}
+	baseUrl, err := c.GetBaseUrl(c.Repository)
+	client, _ := gitlab.NewClient(token, gitlab.WithBaseURL(baseUrl))
+	projectPath, err := c.getProjectPathFromRepoUrl(c.Repository)
+	if err != nil {
+		return "", err
+	}
+	projectInfo, _, err := client.Projects.GetProject(projectPath, nil)
+	if err != nil {
+		return "", err
+	}
+	if projectInfo == nil {
+		return "", fmt.Errorf("project info is empty in GitLab API response")
+	}
+	return projectInfo.DefaultBranch, nil
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
