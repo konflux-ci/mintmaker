@@ -8,6 +8,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-github/v45 v45.2.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/konflux-ci/application-api v0.0.0-20240527211352-be061932d497
 	github.com/onsi/ginkgo/v2 v2.17.3
 	github.com/onsi/gomega v1.33.0
@@ -19,6 +20,7 @@ require (
 	k8s.io/apimachinery v0.29.7
 	k8s.io/client-go v0.29.7
 	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
+	knative.dev/pkg v0.0.0-20240416145024-0f34a8815650
 	sigs.k8s.io/controller-runtime v0.17.5
 )
 
@@ -57,7 +59,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -100,7 +101,6 @@ require (
 	k8s.io/component-base v0.29.7 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240221221325-2ac9dc51f3f1 // indirect
-	knative.dev/pkg v0.0.0-20240416145024-0f34a8815650 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

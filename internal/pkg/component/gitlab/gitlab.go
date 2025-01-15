@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
 	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	"github.com/xanzy/go-gitlab"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,7 +70,6 @@ func (c *Component) GetBranch() (string, error) {
 
 	branch, err := c.getDefaultBranch()
 	if err != nil {
-		// TODO, handle the error
 		return "main", nil
 	}
 	return branch, nil
@@ -169,8 +170,24 @@ func (c *Component) GetAPIEndpoint() string {
 }
 
 func (c *Component) getDefaultBranch() (string, error) {
-	// TODO: call github APIs to determine the default branch
-	return "main", nil
+	token, err := c.GetToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to get GitLab token: %w", err)
+	}
+	u, err := url.Parse(c.GitURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse git url: %w", err)
+	}
+	baseUrl := u.Scheme + "://" + c.Host
+	client, _ := gitlab.NewClient(token, gitlab.WithBaseURL(baseUrl))
+	project, _, err := client.Projects.GetProject(c.Repository, nil)
+	if err != nil {
+		return "", err
+	}
+	if project == nil {
+		return "", fmt.Errorf("project info is empty in GitLab API response")
+	}
+	return project.DefaultBranch, nil
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
