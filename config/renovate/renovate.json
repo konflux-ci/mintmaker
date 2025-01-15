@@ -310,7 +310,8 @@
   },
   "forkProcessing": "enabled",
   "allowedPostUpgradeCommands": [
-    "^rpm-lockfile-prototype rpms.in.yaml$"
+    "^rpm-lockfile-prototype rpms.in.yaml$",
+    "^pipx run --python python3\\.1\\d --spec pip-tools pip-compile[\\sa-zA-Z\\-=\\.\/]+$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false
