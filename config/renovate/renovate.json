@@ -98,7 +98,13 @@
     ],
     "schedule": [
       "after 5am on saturday"
-    ]
+    ],
+    "postUpgradeTasks": {
+      "commands": [
+        "pipeline-migration-tool --renovate-upgrades '{{{ toJSON upgrades }}}' --cache-dir /tmp/pmt-cache"
+      ],
+      "executionMode": "branch"
+    }
   },
   "dockerfile": {
     "enabled": true,
@@ -310,7 +316,8 @@
   },
   "forkProcessing": "enabled",
   "allowedPostUpgradeCommands": [
-    "^rpm-lockfile-prototype rpms.in.yaml$"
+    "^rpm-lockfile-prototype rpms.in.yaml$",
+    "^pipeline-migration-tool --renovate-upgrades '{{{ toJSON upgrades }}}' --cache-dir /tmp/pmt-cache$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false
