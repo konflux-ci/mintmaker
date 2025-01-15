@@ -24,6 +24,7 @@ import (
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -109,6 +110,14 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 											Name:   "renovate",
 											Image:  "quay.io/konflux-ci/mintmaker-renovate-image:latest",
 											Script: `RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) RENOVATE_CONFIG_FILE=/etc/renovate/config/renovate.json renovate`,
+											SecurityContext: &corev1.SecurityContext{
+												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+												RunAsNonRoot:             ptr.To(true),
+												AllowPrivilegeEscalation: ptr.To(false),
+												SeccompProfile: &corev1.SeccompProfile{
+													Type: corev1.SeccompProfileTypeRuntimeDefault,
+												},
+											},
 										},
 									},
 								},
