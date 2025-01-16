@@ -1,8 +1,6 @@
 module github.com/konflux-ci/mintmaker
 
-go 1.22
-
-toolchain go1.22.6
+go 1.22.9
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
