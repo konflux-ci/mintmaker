@@ -313,5 +313,6 @@
     "^rpm-lockfile-prototype rpms.in.yaml$"
   ],
   "updateNotScheduled": false,
-  "dependencyDashboard": false
+  "dependencyDashboard": false,
+  "stopUpdatingLabel": "konflux-nudge"
 }
