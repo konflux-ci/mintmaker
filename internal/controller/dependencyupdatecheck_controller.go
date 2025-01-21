@@ -271,7 +271,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 			},
 		}
 		secretOpts := utils.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-		builder.WithSecret("registry-secrets", "/.docker", secretItems, secretOpts)
+		builder.WithSecret(registry_secret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
 	pipelineRun, err := builder.Build()
