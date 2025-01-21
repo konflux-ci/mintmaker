@@ -225,6 +225,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 		})
+	builder.WithServiceAccount("mintmaker-controller-manager")
 
 	cmItems := []corev1.KeyToPath{
 		{
@@ -259,7 +260,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 			},
 		}
 		caConfigMapOpts := utils.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-		builder.WithConfigMap("trusted-ca", "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
+		builder.WithConfigMap(caConfigMap.ObjectMeta.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
 	if registry_secret != nil {
