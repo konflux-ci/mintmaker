@@ -231,7 +231,10 @@ func (c *Component) getAppInstallations() ([]AppInstallation, error) {
 			for {
 				repos, repoResp, err := installationClient.Apps.ListRepos(context.Background(), repoOpt)
 				if err != nil {
-					return nil, fmt.Errorf("error listing repos for installation %d: %w", installation.GetID(), err)
+					// If App is installed with insufficient permission, this ListRepos call
+					// will return error, we should just skip checking this installation
+					// TODO: error logging
+					continue
 				}
 				for _, repo := range repos.Repositories {
 					appInstall.Repositories = append(appInstall.Repositories, repo.GetFullName())
