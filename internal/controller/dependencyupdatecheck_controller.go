@@ -175,7 +175,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
-	name := fmt.Sprintf("renovate-%d-%s-%s", comp.GetTimestamp(), RandomString(8), comp.GetName())
+	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), RandomString(8))
 	registry_secret, err := r.createMergedPullSecret(ctx)
 
 	renovateConfig, err := comp.GetRenovateConfig(registry_secret)
