@@ -234,7 +234,7 @@ func (c *Component) getAppInstallations() ([]AppInstallation, error) {
 					// If App is installed with insufficient permission, this ListRepos call
 					// will return error, we should just skip checking this installation
 					// TODO: error logging
-					continue
+					break
 				}
 				for _, repo := range repos.Repositories {
 					appInstall.Repositories = append(appInstall.Repositories, repo.GetFullName())
