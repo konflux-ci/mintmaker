@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	MaxSimultaneousPipelineRuns = 5
+	MaxSimultaneousPipelineRuns = 20
 	MintMakerAppstudioLabel     = "mintmaker.appstudio.redhat.com/platform"
 )
 
