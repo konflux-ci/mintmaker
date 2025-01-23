@@ -310,16 +310,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		return nil, err
 	}
 
-	// ownership for the caConfigMap
-	if caConfigMap != nil {
-		if err := controllerutil.SetOwnerReference(pipelineRun, caConfigMap, r.Scheme); err != nil {
-			return nil, err
-		}
-		if err := r.Client.Update(ctx, caConfigMap); err != nil {
-			return nil, err
-		}
-	}
-
 	return pipelineRun, nil
 }
 
