@@ -175,10 +175,25 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
-	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), RandomString(8))
-	registry_secret, err := r.createMergedPullSecret(ctx)
 
-	renovateConfig, err := comp.GetRenovateConfig(registry_secret)
+	var resources []client.Object
+	defer func() {
+		if len(resources) > 0 {
+			for _, resource := range resources {
+				// Ignore error
+				r.Client.Delete(ctx, resource)
+			}
+		}
+	}()
+
+	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), RandomString(8))
+	registrySecret, _ := r.createMergedPullSecret(ctx)
+	// ignore the error, image pull secret is not required for all repositories
+	if registrySecret != nil {
+		resources = append(resources, registrySecret)
+	}
+
+	renovateConfig, err := comp.GetRenovateConfig(registrySecret)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +211,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	if err := r.Client.Create(ctx, renovateConfigMap); err != nil {
 		return nil, err
 	}
+	resources = append(resources, renovateConfigMap)
 
 	// Create Secret for Renovate token (the repository access token)
 	renovateToken, err := comp.GetToken()
@@ -216,6 +232,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	if err := r.Client.Create(ctx, renovateSecret); err != nil {
 		return nil, err
 	}
+	resources = append(resources, renovateSecret)
 
 	// Creating the pipelineRun definition
 	builder := utils.NewPipelineRunBuilder(name, MintMakerNamespaceName).
@@ -263,7 +280,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		builder.WithConfigMap(caConfigMap.ObjectMeta.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
-	if registry_secret != nil {
+	if registrySecret != nil {
 		secretItems := []corev1.KeyToPath{
 			{
 				Key:  ".dockerconfigjson",
@@ -271,7 +288,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 			},
 		}
 		secretOpts := utils.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-		builder.WithSecret(registry_secret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
+		builder.WithSecret(registrySecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
 	pipelineRun, err := builder.Build()
@@ -282,6 +299,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	if err := r.Client.Create(ctx, pipelineRun); err != nil {
 		return nil, err
 	}
+	resources = append(resources, pipelineRun)
 
 	// Set ownership so all resources get deleted once the job is deleted
 	// ownership for renovateSecret
@@ -292,12 +310,12 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		return nil, err
 	}
 
-	// ownership for registry_secret
-	if registry_secret != nil {
-		if err := controllerutil.SetOwnerReference(pipelineRun, registry_secret, r.Scheme); err != nil {
+	// ownership for registrySecret
+	if registrySecret != nil {
+		if err := controllerutil.SetOwnerReference(pipelineRun, registrySecret, r.Scheme); err != nil {
 			return nil, err
 		}
-		if err := r.Client.Update(ctx, registry_secret); err != nil {
+		if err := r.Client.Update(ctx, registrySecret); err != nil {
 			return nil, err
 		}
 	}
@@ -310,6 +328,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		return nil, err
 	}
 
+	resources = nil
 	return pipelineRun, nil
 }
 
@@ -397,7 +416,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		log.Info("creating pending PipelineRun")
 		pipelinerun, err := r.createPipelineRun(comp, ctx)
 		if err != nil {
-			log.Error(err, "failed to create PipelineRun")
+			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
 		} else {
 			log.Info(fmt.Sprintf("created PipelineRun %s", pipelinerun.Name))
 		}
