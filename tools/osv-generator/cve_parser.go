@@ -9,23 +9,42 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/dchest/uniuri"
 )
+
+func retryGet(url string, maxRetries int, backoff time.Duration) (string, error) {
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		resp, err := http.Get(url)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return "", fmt.Errorf("could not read response body: %w", err)
+			}
+			return string(body), nil
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+		lastErr = err
+
+		fmt.Printf("Retry %d/%d failed: %v\n", i+1, maxRetries, err)
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+
+	return "", fmt.Errorf("all retries failed: %w", lastErr)
+}
 
 // Download CSAF VEX file from given URL and store into a VEX struct
 func GetVEXFromUrl(url string) (VEX, error) {
-	resp, err := http.Get(url)
+	body, err := retryGet(url, 5, time.Second)
 	if err != nil {
-		return VEX{}, fmt.Errorf("could not fetch URL: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return VEX{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return VEX{}, fmt.Errorf("could not read response body: %v", err)
+		return VEX{}, err
 	}
 
 	var vexData VEX
@@ -38,15 +57,26 @@ func GetVEXFromUrl(url string) (VEX, error) {
 	return vexData, nil
 }
 
-// Convert VEX RPM data to OSV format
-func ConvertToOSV(vexData VEX) []OSV {
-	// Get list of affected packages
-	affectedList := getAffectedList(vexData)
-
+// Convert VEX data to OSV format
+func ConvertToOSV(vexData VEX, containerVulns bool) []OSV {
 	var vulnerabilities []OSV
+	var affectedList []*Affected
+
+	// Get list of affected packages
+	if !containerVulns {
+		affectedList = getAffectedListRPMs(vexData)
+	} else {
+		affectedList = getAffectedListContainers(vexData)
+		// if there are no affected containers, skip creating a vulnerability
+		if len(affectedList) == 0 {
+			return vulnerabilities
+		}
+	}
+
 	for _, vulnerability := range vexData.Vulnerabilities {
 		// Create OSV vulnerability object for each CVE
 		osvVulnerability := OSV{
+			IdInternal:    uniuri.New(),
 			SchemaVersion: "1.6.0",
 			Id:            vulnerability.Cve,
 			DatabaseSpecific: &DatabaseSpecific{
@@ -85,7 +115,7 @@ func StoreToFile(filename string, convertedVulnerabilities []OSV) error {
 }
 
 // Get list of affected RPM packages from VEX data
-func getAffectedList(vex VEX) []*Affected {
+func getAffectedListRPMs(vex VEX) []*Affected {
 	var affectedList []*Affected
 
 	// Traverse dependencies tree
@@ -127,6 +157,58 @@ func getAffectedList(vex VEX) []*Affected {
 					// There will be duplicated dependencied from different architectures, store data once
 					if !contains(affectedList, affectedPackage) {
 						affectedList = append(affectedList, &affectedPackage)
+					}
+				}
+			}
+		}
+	}
+	return affectedList
+}
+
+func getAffectedListContainers(vex VEX) []*Affected {
+	var affectedList []*Affected
+
+	// Traverse dependencies tree
+	for _, branch := range vex.ProductTree.Branches {
+		for _, subBranch := range branch.Branches {
+			if subBranch.Category == "architecture" {
+				for _, subSubBranch := range subBranch.Branches {
+					// Collect only container dependencies
+					if !strings.HasPrefix(subSubBranch.Product.ProductIdentificationHelper.Purl, "pkg:oci") {
+						continue
+					}
+
+					// Parse name and version from pURL
+					re := regexp.MustCompile(`pkg:oci/.*&repository_url=([^&]+)`)
+					matches := re.FindStringSubmatch(subSubBranch.Product.ProductIdentificationHelper.Purl)
+					repositoryUrl := matches[1]
+
+					affectedPackage := Affected{
+						Package: &Package{
+							Ecosystem: "Docker",
+							Name:      repositoryUrl,
+							Purl:      subSubBranch.Product.ProductIdentificationHelper.Purl,
+						},
+						Ranges: []*Range{},
+					}
+					// CVE data only contain the registry.redhat.io domain. But some images are also
+					// accessible through registry.access.redhat.com. Create entries for those images
+					// so that their vulnerabilities can be matched as well.
+					affectedPackageOldRegistry := Affected{
+						Package: &Package{
+							Ecosystem: "Docker",
+							Name:      strings.ReplaceAll(repositoryUrl, "registry.redhat.io", "registry.access.redhat.com"),
+							Purl:      strings.ReplaceAll(subSubBranch.Product.ProductIdentificationHelper.Purl, "registry.redhat.io", "registry.access.redhat.com"),
+						},
+						Ranges: []*Range{},
+					}
+
+					// There will be duplicated dependencies from different architectures, store data once
+					if !contains(affectedList, affectedPackage) {
+						affectedList = append(affectedList, &affectedPackage)
+					}
+					if !contains(affectedList, affectedPackageOldRegistry) {
+						affectedList = append(affectedList, &affectedPackageOldRegistry)
 					}
 				}
 			}

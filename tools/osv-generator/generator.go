@@ -14,7 +14,8 @@ const URL = "https://security.access.redhat.com/data/csaf/v2/advisories"
 // Get list of new advisories published in the last `days`
 // TODO: Do not use until published.csv is periodically generated
 func getAdvisoryListByPublished(days int) ([]string, error) {
-	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "published.csv"))
+	// TODO: change filename to releases.csv!!! changes.csv is for testing purposes only!
+	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "changes.csv"))
 	if err != nil {
 		fmt.Println("Error downloading file:", err)
 		return nil, err
@@ -88,19 +89,19 @@ func getAdvisoryListByModified(limit int) ([]string, error) {
 }
 
 // Extract advisory data from the given URL, store as list of OSV objects
-func extractAdvisory(advisory string) []OSV {
+func extractAdvisory(advisory string, containerVulns bool) []OSV {
 	vexVulnerability, err := GetVEXFromUrl(fmt.Sprintf("%s/%s", URL, advisory))
 	if err != nil {
 		panic(err)
 	}
-	convertedVulnerabilities := ConvertToOSV(vexVulnerability)
+	convertedVulnerabilities := ConvertToOSV(vexVulnerability, containerVulns)
 	return convertedVulnerabilities
 }
 
 // Generate OSV vulnerabilities from CSAF VEX data and store to a file
-func GenerateOSV(filename string) error {
+func GenerateOSV(filename string, containerVulns bool, days int) error {
 	var osvList []OSV
-	advisories, err := getAdvisoryListByModified(200)
+	advisories, err := getAdvisoryListByPublished(days)
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func GenerateOSV(filename string) error {
 	advisoryChan := make(chan []OSV)
 	for _, advisory := range advisories {
 		go func(advisory string) {
-			advisoryChan <- extractAdvisory(advisory)
+			advisoryChan <- extractAdvisory(advisory, containerVulns)
 		}(advisory)
 	}
 	for range advisories {
