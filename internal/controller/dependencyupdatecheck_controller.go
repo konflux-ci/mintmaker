@@ -171,7 +171,7 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitComponent, ctx context.Context) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitComponent, ctx context.Context, registrySecret *corev1.Secret) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
@@ -187,11 +187,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	}()
 
 	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), RandomString(8))
-	registrySecret, _ := r.createMergedPullSecret(ctx)
-	// ignore the error, image pull secret is not required for all repositories
-	if registrySecret != nil {
-		resources = append(resources, registrySecret)
-	}
 
 	renovateConfig, err := comp.GetRenovateConfig(registrySecret)
 	if err != nil {
@@ -310,16 +305,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		return nil, err
 	}
 
-	// ownership for registrySecret
-	if registrySecret != nil {
-		if err := controllerutil.SetOwnerReference(pipelineRun, registrySecret, r.Scheme); err != nil {
-			return nil, err
-		}
-		if err := r.Client.Update(ctx, registrySecret); err != nil {
-			return nil, err
-		}
-	}
-
 	// ownership for the renovateConfigMap
 	if err := controllerutil.SetOwnerReference(pipelineRun, renovateConfigMap, r.Scheme); err != nil {
 		return nil, err
@@ -406,6 +391,19 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
+	registrySecret, _ := r.createMergedPullSecret(ctx)
+	// ignore the error, image pull secret is not required for all repositories
+	// and set the ownership for registrySecret
+	if registrySecret != nil {
+		if err := controllerutil.SetOwnerReference(dependencyupdatecheck, registrySecret, r.Scheme); err != nil {
+			log.Info(fmt.Sprintf("failed to set ownership for the registry secret: %s", err.Error()))
+		} else {
+			if err := r.Client.Update(ctx, registrySecret); err != nil {
+				log.Info(fmt.Sprintf("failed to update the registry secret: %s", err.Error()))
+			}
+		}
+	}
+
 	timestamp := time.Now().UTC().Unix()
 	for _, appstudioComponent := range componentList {
 		comp, err := component.NewGitComponent(&appstudioComponent, timestamp, r.Client, ctx)
@@ -414,7 +412,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			continue
 		}
 		log.Info("creating pending PipelineRun")
-		pipelinerun, err := r.createPipelineRun(comp, ctx)
+		pipelinerun, err := r.createPipelineRun(comp, ctx, registrySecret)
 		if err != nil {
 			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
 		} else {
