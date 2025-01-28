@@ -176,7 +176,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
 
-	log.Info("Starting the creation of the PipelineRun")
 	var resources []client.Object
 	defer func() {
 		if len(resources) > 0 {
@@ -189,12 +188,10 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 
 	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), RandomString(8))
 
-	log.Info("Getting Renovate config")
 	renovateConfig, err := comp.GetRenovateConfig(registrySecret)
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Creation the config map for the Renovate config")
 	// Create ConfigMap for Renovate global configuration
 	renovateConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -212,12 +209,10 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	resources = append(resources, renovateConfigMap)
 
 	// Create Secret for Renovate token (the repository access token)
-	log.Info("Getting the token from the component to create the secret for Renovate token")
 	renovateToken, err := comp.GetToken()
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Creating the secret for Renovate token")
 	renovateSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -235,7 +230,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	resources = append(resources, renovateSecret)
 
 	// Creating the pipelineRun definition
-	log.Info("Creating the PipelineRun definition")
 	builder := utils.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
@@ -266,7 +260,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	// Check if a ConfigMap with the label `config.openshift.io/inject-trusted-cabundle: "true"` exists.
 	// If such a ConfigMap is found, add a volume to the PipelineRun specification to mount this ConfigMap.
 	// The volume will be mounted at '/etc/pki/ca-trust/extracted/pem' within the PipelineRun Pod.
-	log.Info("Getting the CA configmap")
 	caConfigMap, err := r.getCAConfigMap(ctx)
 	if err != nil {
 		log.Error(err, "Failed to get CAConfigMap - moving on")
@@ -282,7 +275,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		builder.WithConfigMap(caConfigMap.ObjectMeta.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
-	log.Info("adding registry secret as mount option")
 	if registrySecret != nil {
 		secretItems := []corev1.KeyToPath{
 			{
@@ -294,7 +286,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 		builder.WithSecret(registrySecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
-	log.Info("I adding registry secret as mount option")
 	pipelineRun, err := builder.Build()
 	if err != nil {
 		log.Error(err, "failed to build pipeline definition")
@@ -305,7 +296,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	}
 	resources = append(resources, pipelineRun)
 
-	log.Info("Set ownership for the secret and configmap")
 	// Set ownership so all resources get deleted once the job is deleted
 	// ownership for renovateSecret
 	if err := controllerutil.SetOwnerReference(pipelineRun, renovateSecret, r.Scheme); err != nil {
