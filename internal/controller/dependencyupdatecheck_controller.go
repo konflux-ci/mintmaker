@@ -110,10 +110,8 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 	log.Info(fmt.Sprintf("Found %d secrets to merge", len(secretList.Items)))
 
 	mergedAuths := make(map[string]interface{})
-	log.Info("Starting looping through the secretList")
 	for _, secret := range secretList.Items {
 		if secret.Type == corev1.SecretTypeDockerConfigJson {
-			log.Info("Secret of type dockerconfigjson")
 			data, exists := secret.Data[".dockerconfigjson"]
 			if !exists {
 				// No .dockerconfigjson section
@@ -122,25 +120,21 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 			}
 
 			var dockerConfig map[string]interface{}
-			log.Info("Unmarshalling the json data for the dockerConfig")
 			if err := json.Unmarshal(data, &dockerConfig); err != nil {
 				return nil, err
 			}
 
-			log.Info("extracting `auths` from the dockerconfig")
 			auths, exists := dockerConfig["auths"].(map[string]interface{})
 			if !exists {
 				continue
 			}
 
-			log.Info("starting to loop through the auths from the dockerconfig")
 			for registry, creds := range auths {
 				mergedAuths[registry] = creds
 			}
 		}
 	}
 
-	log.Info("we have a merged dockerconfig")
 	mergedDockerConfig := map[string]interface{}{
 		"auths": mergedAuths,
 	}
@@ -150,7 +144,6 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 		return nil, nil
 	}
 
-	log.Info("marshal that dockerconfig into json")
 	mergedConfigJson, err := json.Marshal(mergedDockerConfig)
 	if err != nil {
 		return nil, err
@@ -159,7 +152,6 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 	timestamp := time.Now().Unix()
 	name := fmt.Sprintf("renovate-image-pull-secrets-%d-%s", timestamp, RandomString(5))
 
-	log.Info("creating the new secret")
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
