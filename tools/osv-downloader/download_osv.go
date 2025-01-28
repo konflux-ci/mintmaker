@@ -89,8 +89,8 @@ func unzipFile(archive_path string, destination string) error {
 		if _, err := io.Copy(destFile, fileInArchive); err != nil {
 			return err
 		}
-		destFile.Close()
-		fileInArchive.Close()
+		defer destFile.Close()
+		defer fileInArchive.Close()
 	}
 	return nil
 }
