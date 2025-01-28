@@ -103,7 +103,7 @@
   "dockerfile": {
     "enabled": true,
     "schedule": [
-      "after 5am on monday"
+      "before 5am"
     ]
   },
   "rpm": {
