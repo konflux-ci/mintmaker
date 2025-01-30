@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
@@ -116,6 +117,16 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												AllowPrivilegeEscalation: ptr.To(false),
 												SeccompProfile: &corev1.SeccompProfile{
 													Type: corev1.SeccompProfileTypeRuntimeDefault,
+												},
+											},
+											ComputeResources: corev1.ResourceRequirements{
+												Requests: corev1.ResourceList{
+													"cpu":    resource.MustParse("150m"),
+													"memory": resource.MustParse("512Mi"),
+												},
+												Limits: corev1.ResourceList{
+													"cpu":    resource.MustParse("300m"),
+													"memory": resource.MustParse("1Gi"),
 												},
 											},
 											Env: []corev1.EnvVar{
