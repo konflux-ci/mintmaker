@@ -13,6 +13,9 @@
   "inheritConfig": true,
   "platformCommit": "enabled",
   "autodiscover": false,
+  "customEnvVariables": {
+    "GOTOOLCHAIN": "auto"
+  },
   "vulnerabilityAlerts": {
     "enabled": false
   },
