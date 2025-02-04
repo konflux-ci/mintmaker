@@ -422,6 +422,8 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		branch, _ := comp.GetBranch()
 		key := fmt.Sprintf("%s@%s", comp.GetRepository(), branch)
 
+		log.Info(fmt.Sprintf("check if PipelineRun has been created for %s ", key))
+
 		if slices.Contains(processedComponents, key) {
 			// PipelineRun has already been created for this repo-branch
 			continue
@@ -429,7 +431,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			processedComponents = append(processedComponents, key)
 		}
 
-		log.Info("creating pending PipelineRun")
+		log.Info(fmt.Sprintf("creating pending PipelineRun for %s", key))
 		pipelinerun, err := r.createPipelineRun(comp, ctx, registrySecret)
 		if err != nil {
 			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
