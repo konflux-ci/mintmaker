@@ -422,7 +422,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		branch, _ := comp.GetBranch()
 		key := fmt.Sprintf("%s/%s@%s", comp.GetHost(), comp.GetRepository(), branch)
 
-		log.Info(fmt.Sprintf("check if PipelineRun has been created for %s ", key))
+		log.Info(fmt.Sprintf("check if PipelineRun has been created for %s", key))
 
 		if slices.Contains(processedComponents, key) {
 			// PipelineRun has already been created for this repo-branch
