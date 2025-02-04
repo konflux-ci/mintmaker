@@ -420,7 +420,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		// of repository+branch. We cannot use repository only,
 		// because the branch is used in Renovate's baseBranch config option.
 		branch, _ := comp.GetBranch()
-		key := fmt.Sprintf("%s@%s", comp.GetRepository(), branch)
+		key := fmt.Sprintf("%s/%s@%s", comp.GetHost(), comp.GetRepository(), branch)
 
 		log.Info(fmt.Sprintf("check if PipelineRun has been created for %s ", key))
 
