@@ -404,8 +404,20 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	}
 
+	// Filter out duplicate repo URLs
+	uniqueComponents := make(map[string]appstudiov1alpha1.Component)
+	deduplicatedComponents := make([]appstudiov1alpha1.Component, 0, len(uniqueComponents))
+
+	for _, comp := range componentList {
+		uniqueComponents[comp.Spec.Source.GitSource.URL] = comp
+	}
+
+	for _, comp := range uniqueComponents {
+		deduplicatedComponents = append(deduplicatedComponents, comp)
+	}
+
 	timestamp := time.Now().UTC().Unix()
-	for _, appstudioComponent := range componentList {
+	for _, appstudioComponent := range deduplicatedComponents {
 		comp, err := component.NewGitComponent(&appstudioComponent, timestamp, r.Client, ctx)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("failed to handle component: %s", appstudioComponent.Name))
