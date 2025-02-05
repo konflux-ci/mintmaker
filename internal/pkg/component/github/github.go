@@ -305,6 +305,18 @@ func (c *Component) getAppSlug() (string, error) {
 	return slug, nil
 }
 
+func (c *Component) getUserId(username string) (int64, error) {
+	// No need to add auth here as User API is public
+	client := github.NewClient(&http.Client{})
+
+	user, _, err := client.Users.Get(context.Background(), username)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get user information: %w", err)
+	}
+	id := user.GetID()
+	return id, nil
+}
+
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
 	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx, registrySecret)
 	if err != nil {
@@ -314,10 +326,15 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 	if err != nil {
 		return "", err
 	}
+	botId, err := c.getUserId(appSlug + "[bot]")
+	if err != nil {
+		return "", err
+	}
+
+	baseConfig["gitAuthor"] = fmt.Sprintf("%s <%d+%s[bot]@users.noreply.github.com>", appSlug, botId, appSlug)
+	baseConfig["username"] = fmt.Sprintf("%s[bot]", appSlug)
 	baseConfig["platform"] = c.Platform
 	baseConfig["endpoint"] = c.GetAPIEndpoint()
-	baseConfig["username"] = fmt.Sprintf("%s[bot]", appSlug)
-	baseConfig["gitAuthor"] = fmt.Sprintf("%s <126015336+%s[bot]@users.noreply.github.com>", appSlug, appSlug)
 
 	// TODO: perhaps in the future let's validate all these values
 	branch, err := c.GetBranch()
