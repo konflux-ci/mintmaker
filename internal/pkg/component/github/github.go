@@ -29,10 +29,9 @@ var (
 	ghAppInstallationTokenCache      *Cache
 	ghAppInstallationTokenCacheMutex sync.Mutex
 	ghAppInstallationTokenCacheID    int64
-	ghUsersCache                     *Cache
-	ghUsersCacheMutex                sync.Mutex
 	ghAppID                          int64
 	ghAppPrivateKey                  []byte
+	ghUserID                         int64
 )
 
 type AppInstallation struct {
@@ -308,17 +307,9 @@ func (c *Component) getAppSlug() (string, error) {
 }
 
 func (c *Component) getUserId(username string) (int64, error) {
-	ghUsersCacheMutex.Lock()
-	defer ghUsersCacheMutex.Unlock()
-
-	if ghUsersCache == nil {
-		ghUsersCache = NewCache()
+	if ghUserID != 0 {
+		return ghUserID, nil
 	}
-
-	if userId, ok := ghUsersCache.Get(username); ok {
-		return userId.(int64), nil
-	}
-
 	// No need to add auth here as User API is public
 	client := github.NewClient(&http.Client{})
 
@@ -327,9 +318,8 @@ func (c *Component) getUserId(username string) (int64, error) {
 		return 0, fmt.Errorf("failed to get user information: %w", err)
 	}
 
-	id := user.GetID()
-	ghUsersCache.Set(username, id)
-	return id, nil
+	ghUserID = user.GetID()
+	return ghUserID, nil
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
