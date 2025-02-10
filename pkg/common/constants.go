@@ -1,5 +1,7 @@
 package common
 
+import "time"
+
 const (
 	MintMakerNamespaceName = "mintmaker"
 	// Mintmaker will add processed annotation when the dependencyupdatecheck is processed by controller
@@ -12,4 +14,7 @@ const (
 	// Keys of the GitHub app ID and the app private key in the pipelines-as-code-secret
 	PipelinesAsCodeGithubAppIdKey   = "github-application-id"
 	PipelinesAsCodeGithubPrivateKey = "github-private-key"
+	GhTokenValidity                 = 1 * time.Hour
+	GhTokenUsageWindow              = 30 * time.Minute
+	GhTokenRenewThreshold           = GhTokenValidity - GhTokenUsageWindow
 )
