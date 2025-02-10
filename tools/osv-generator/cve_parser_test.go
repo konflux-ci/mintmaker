@@ -50,6 +50,12 @@ var vexSampleFile = []byte(`{
                             "purl": "pkg:go/fakepackage@1.0.0?arch=x86_64"
                         }
                     }
+                }, {
+                    "product": {
+                        "product_identification_helper": {
+                            "purl": "pkg:oci/test-image@sha256:abcd?arch=amd64&repository_url=some-registry.com/org/repo&tag=v1"
+                        }
+                    }
                 }]
             }, {
                 "category": "irrelevant",
@@ -73,8 +79,8 @@ func init() {
 	}
 }
 
-func TestGetAffectedList(t *testing.T) {
-	affectedList := getAffectedList(vexSampleObject)
+func TestGetAffectedListRPMs(t *testing.T) {
+	affectedList := getAffectedListRPMs(vexSampleObject)
 
 	if len(affectedList) != 1 {
 		t.Fatalf("expected 1 affected package, got %d", len(affectedList))
@@ -84,6 +90,20 @@ func TestGetAffectedList(t *testing.T) {
 	}
 	if affectedList[0].Package.Purl != "pkg:rpm/testpackage@1.0.1" {
 		t.Fatalf("expected pkg:rpm/testpackage@1.0.0, got %s", affectedList[0].Package.Purl)
+	}
+}
+
+func TestGetAffectedListContainers(t *testing.T) {
+	affectedList := getAffectedListContainers(vexSampleObject)
+
+	if len(affectedList) != 1 {
+		t.Fatalf("expected 1 affected package, got %d", len(affectedList))
+	}
+	if affectedList[0].Package.Name != "some-registry.com/org/repo" {
+		t.Fatalf("expected some-registry.com/org/repo, got %s", affectedList[0].Package.Name)
+	}
+	if affectedList[0].Package.Purl != "pkg:oci/test-image@sha256:abcd?arch=amd64&repository_url=some-registry.com/org/repo&tag=v1" {
+		t.Fatalf("pkg:oci/test-image@sha256:abcd?arch=amd64&repository_url=some-registry.com/org/repo&tag=v1, got %s", affectedList[0].Package.Purl)
 	}
 }
 
@@ -154,7 +174,7 @@ func TestConvertToOSV(t *testing.T) {
 		},
 	}
 
-	osv := ConvertToOSV(vexSampleObject)
+	osv := ConvertToOSV(vexSampleObject, false)
 	if len(osv) != 1 {
 		t.Fatalf("expected 1 OSV, got %d", len(osv))
 	}

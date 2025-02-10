@@ -23,6 +23,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.17.5
 )
 
+require github.com/dchest/uniuri v1.2.0 // indirect
+
 require (
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20200907061046-05415f1de66d // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
