@@ -314,7 +314,7 @@
     ]
   },
   "forkProcessing": "enabled",
-  "allowedPostUpgradeCommands": [
+  "allowedCommands": [
     "^rpm-lockfile-prototype rpms.in.yaml$"
   ],
   "updateNotScheduled": false,
