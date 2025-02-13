@@ -41,6 +41,23 @@ same job might not be possible from the UI):
 
 ## Release process
 
+> [!NOTE]
+> The release process is now automated. After merging PRs into either
+> konflux-ci/mintmaker or konflux-ci/mintmaker-renovate-image, a PR
+> for updating stage will open in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repository
+> with the title `mintmaker update` or `mintmaker-renovate-image update`.
+> 
+> After merging the stage PRs, a PR titled
+>  `Promoting component mintmaker from stage to prod` will open automatically
+> to update the digests in production.
+> 
+> All you have to do now is to check that the digests are the ones
+> you intend to release and that the images exist in their respective Quay
+> repositories.
+> 
+> The following text describes the manual release process, which can
+> still occasionally be helpful.
+
 In this section we will describe the steps to make a release. We will see each
 step separately in detail, and also provide a checklist by the end.
 
@@ -62,7 +79,6 @@ reference udpates).
 
 In case you are making changes only to the configuration file, you can skip to
 the [stage run step](./developer.md#stage-run-to-check-the-new-build).
-
 
 ### Wait until Konflux automatic build finishes
 
@@ -105,7 +121,6 @@ explained before to make an on-demand run. Be sure to use the image built by Kon
 
 
 ### Make a change request to infra-deployments to push the new build to production
-
 
 MintMaker is released to Konflux through the [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
 repository. The **Production** environment uses a fixed tag and commit for the
