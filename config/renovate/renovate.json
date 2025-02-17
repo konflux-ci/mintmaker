@@ -64,7 +64,9 @@
     "runtime-version",
     "setup-cfg",
     "gomod",
-    "ocb"
+    "ocb",
+    "gitlabci",
+    "gitlabci-include"
   ],
   "tekton": {
     "additionalBranchPrefix": "",
@@ -209,6 +211,16 @@
     ]
   },
   "kustomize": {
+    "schedule": [
+      "after 5am on wednesday"
+    ]
+  },
+  "gitlabci": {
+    "schedule": [
+      "after 5am on wednesday"
+    ]
+  },
+  "gitlabci-include": {
     "schedule": [
       "after 5am on wednesday"
     ]
