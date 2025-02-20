@@ -47,6 +47,9 @@ var (
 	ghAppID                      int64
 	ghAppPrivateKey              []byte
 	ghUserID                     int64
+	// vars for mocking purposes, during testing
+	GetRenovateConfigFn func(registrySecret *corev1.Secret) (string, error)
+	GetTokenFn          func() (string, error)
 )
 
 type AppInstallation struct {
@@ -163,6 +166,10 @@ func (c *Component) getMyInstallationID() (int64, error) {
 }
 
 func (c *Component) GetToken() (string, error) {
+
+	if GetTokenFn != nil {
+		return GetTokenFn()
+	}
 
 	installationID, err := c.getMyInstallationID()
 	if err != nil {
@@ -348,6 +355,10 @@ func (c *Component) getUserId(username string) (int64, error) {
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+	if GetRenovateConfigFn != nil {
+		return GetRenovateConfigFn(registrySecret)
+	}
+
 	baseConfig, err := c.GetRenovateBaseConfig(c.client, c.ctx, registrySecret)
 	if err != nil {
 		return "", err
