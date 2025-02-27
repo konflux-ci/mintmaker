@@ -39,6 +39,35 @@ const (
 	interval = time.Millisecond * 250
 )
 
+var testPrivateKey = "-----BEGIN PRIVATE KEY-----\n" +
+	"MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0lZNSLqX1n2aO" +
+	"loffn3rBL2+3Mm/GnjkWVQz76TS3KO7RSf4Det017H80XUumx3fT26rZ+wgpN8fi" +
+	"CCB2LWRlMVbQr2WxCl03l3/FmHRrbUPflbn5TWyxEUj4nST5BsIFkcXXVG2sHUuM" +
+	"+ZR5sbJadLLsj2Qn6Iy7zwV/pyDf89tZMXsTvO4SBhnYvitkDg6p3ar6uXMDd3aX" +
+	"Cwib8s/qJW7w7M/5duoVvtlBnsPpVjJvfmwOH2jzhzWOj0KaaS2Z+DIqnSyiU4Jd" +
+	"vvUlQLp3rmvTgf6R38P3phcLwb3gdu+9BqwP73vF9R52SXxfcFNRJ3cD9GdcYdL4" +
+	"/2hqqtknAgMBAAECggEAFLvfxbMpcZbdtZ1powQH73USL0c74jgkdytIvwZlpmoC" +
+	"vEZHQ1WwtGefq1QoQtFAMYj/3YtJwpcZp3AmGgDYOBjUI53KipXqt16jraegJlLN" +
+	"/4viEH0SmmSmVjU6G4WVHVfsDpnZBcakorO9Qm5j+1LO1a5uYiP8lKEOZpEP4JFI" +
+	"1T81LuyQDgsbZlmPEuxE0GSGkHKxT+b6VmvCvkN8gjUuYkHNNwd0lbqBvOvh9rSu" +
+	"2iSONFHIYJloC6e09+cDlM/DedwS3aOpaoOzq8HGeIZLCo1XoBlqWx+NyyXbDKaS" +
+	"eDAldq+4npEx58E4wt5Wy/FpBHInvOLXM6RQZn2n8QKBgQDv/oL4KlPvlaCV7qtK" +
+	"gBbKxLjk2EZGqAuAHaskMDTAsexyXUuzPEO2cNgPGVuiPpbYtg2LI5Wngan56f3O" +
+	"7b5SUykIa0DuvMgZyp80W5pCxfHROxUL6t9gyCaOwyl9ejvocF3H40JX56WT/DZC" +
+	"U0M5xiSODStYyQCzScGS4PVE7QKBgQDAoL3lqQE9obw4ipO0CKnRlU5zoitClj8L" +
+	"3CtkP/uoR/lHQvJlZz0xyhV2ansZxtPBdjB5u79q8wRV8HeTCGmZKuN5tfC7ZnH4" +
+	"TEaq1AjIIim2zfCJaLT1L+6jS5+MUWZPoDfWrHdGFYuPtN8FMqaojz7kI0p33uMm" +
+	"lff/fjVH4wKBgA5TWu4FWM1MWTGZ9Y+U5cdkxsSiRE+jaExVeQnH9t4pwLty5jnk" +
+	"twYE5mDAWr/sjISTGWvcy+oby1GnrgbUGjA/1osyG8Ykbq1bcvVlImgp+K1MoYz8" +
+	"kCjuyZ5r9+YNjdXqHy73WdZ1dWTIAVUkMzcXpMb18khydyA8ntltpDZhAoGAJJil" +
+	"W1OPg8kNfGR/iU24DbRjEj72HxFyautqZwJs6ly6NFq4uKEzlBkDmNrEBnKq2m98" +
+	"6DPOOyBua3FjFlEb1ti6HO5/DOt6raS4LE5aWMN8z1ky4Lg+4PI5UVbVug/g8zHK" +
+	"SgO8KVmAiU3grRkhZpbIaQl3ZWy4FSWa1zSAJOcCgYEA1IEZPnJDM8Hlqj/vZBRa" +
+	"t2/ZKaNf3Je64KElsfvQ/SoMmOPHkfFfJK3+GqQbsjQ6Jr4MwzjDia3GcIagui3t" +
+	"mvfkc6syo7pMwBIylWZVCIGtyW/CVPL8uMA+6yvgksEIeVL40DfO6cI5OH7kQp87" +
+	"t8RRiu3Z5nY3spNv38kAa9s=" +
+	"\n-----END PRIVATE KEY-----"
+
 func createNamespace(name string) {
 	namespace := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
@@ -134,11 +163,12 @@ func deleteSecret(resourceKey types.NamespacedName) {
 	}, timeout, interval).Should(BeTrue())
 }
 
-func getSecret(resourceKey types.NamespacedName) {
+func getSecret(resourceKey types.NamespacedName) *corev1.Secret {
+	secret := &corev1.Secret{}
 	Eventually(func() error {
-		secret := &corev1.Secret{}
 		return k8sClient.Get(ctx, resourceKey, secret)
 	}, timeout, interval).Should(Succeed())
+	return secret
 }
 
 func createConfigMap(resourceKey types.NamespacedName, data map[string]string) {

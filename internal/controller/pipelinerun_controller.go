@@ -160,10 +160,10 @@ func (r *PipelineRunReconciler) startPipelineRun(plr tektonv1.PipelineRun, ctx c
 	if err != nil {
 		return false
 	}
-
 	tokenBString := []byte(token)
+
 	appSecret := corev1.Secret{}
-	appSecretKey := types.NamespacedName{Namespace: "mintmaker", Name: plr.Name}
+	appSecretKey := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: plr.Name}
 	err = r.Client.Get(ctx, appSecretKey, &appSecret)
 	if err != nil {
 		return false

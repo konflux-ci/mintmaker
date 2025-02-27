@@ -18,27 +18,61 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	ghcomponent "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
 var _ = Describe("DependencyUpdateCheck Controller", func() {
 
-	var ()
+	var (
+		origGetRenovateConfig func(registrySecret *corev1.Secret) (string, error)
+		origGetTokenFn        func() (string, error)
+	)
 
 	Context("Test Renovate jobs creation", func() {
 
 		_ = BeforeEach(func() {
 			createNamespace(MintMakerNamespaceName)
+			createNamespace("testnamespace")
+			createComponent(
+				types.NamespacedName{Name: "testcomp", Namespace: "testnamespace"}, "app", "https://github.com/testcomp.git", "gitrevision", "gitsourcecontext",
+			)
+			secretData := map[string]string{
+				"github-application-id": "1234567890",
+				"github-private-key":    testPrivateKey,
+			}
+			createSecret(
+				types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"}, secretData,
+			)
+			configMapData := map[string]string{"renovate.json": "{}"}
+			createConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"}, configMapData)
+
+			origGetRenovateConfig = ghcomponent.GetRenovateConfigFn
+			ghcomponent.GetRenovateConfigFn = func(registrySecret *corev1.Secret) (string, error) {
+				return "mock config", nil
+			}
+
+			origGetTokenFn = ghcomponent.GetTokenFn
+			ghcomponent.GetTokenFn = func() (string, error) {
+				return "tokenstring", nil
+			}
+
+			Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(0))
 		})
 
 		_ = AfterEach(func() {
 			deletePipelineRuns(MintMakerNamespaceName)
+			deleteComponent(types.NamespacedName{Name: "testcomp", Namespace: "testnamespace"})
+			deleteSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"})
+			deleteConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"})
+			ghcomponent.GetRenovateConfigFn = origGetRenovateConfig
+			ghcomponent.GetTokenFn = origGetTokenFn
 		})
 
 		It("should create a pipeline run when a CR DependencyUpdateCheck is created", func() {
-			// Create a DependencyUpdateCheck CR in "mintmaker" namespace
 			dependencyUpdateCheckKey := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "dependencyupdatecheck-sample"}
 			createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
 			Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1))
