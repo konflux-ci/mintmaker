@@ -16,6 +16,7 @@
   "pruneStaleBranches": false,
   "branchConcurrentLimit": 0,
   "containerVulnerabilityAlerts": true,
+  "rpmVulnerabilityAlerts": true,
   "customEnvVariables": {
     "GOTOOLCHAIN": "auto"
   },
@@ -143,9 +144,15 @@
         ]
       }
     ],
+    "vulnerabilityAlerts": {
+      "branchTopic": "rpm-updates"
+    },
     "schedule": [
       "before 5am"
-    ]
+    ],
+    "lockFileMaintenance": {
+      "enabled": false
+    }
   },
   "lockFileMaintenance": {
     "enabled": true,
