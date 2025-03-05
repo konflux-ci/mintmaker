@@ -139,6 +139,7 @@
         "groupName": "RPM updates",
         "commitMessageAction": "",
         "commitMessageTopic": "RPM updates",
+        "commitMessageExtra": "",
         "matchManagers": [
           "rpm"
         ]
