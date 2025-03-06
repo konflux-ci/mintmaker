@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
 - appstudio_v1alpha1_dependencyupdatecheck.yaml
-#+kubebuilder:scaffold:manifestskustomizesamples
+# +kubebuilder:scaffold:manifestskustomizesamples
