@@ -2,11 +2,8 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: DependencyUpdateCheck
 metadata:
   labels:
-    app.kubernetes.io/name: dependencyupdatecheck
-    app.kubernetes.io/instance: dependencyupdatecheck-sample
-    app.kubernetes.io/part-of: mintmaker
+    app.kubernetes.io/name: mintmaker
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: mintmaker
   generateName: dependencyupdatecheck-
 spec:
   workspaces:
