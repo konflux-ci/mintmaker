@@ -178,6 +178,10 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 													Value: "debug",
 												},
 												{
+													Name:  "LOG_FORMAT",
+													Value: "json",
+												},
+												{
 													Name:  "OSV_OFFLINE_DISABLE_DOWNLOAD",
 													Value: "true",
 												},
