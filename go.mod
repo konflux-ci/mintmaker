@@ -7,7 +7,7 @@ toolchain go1.23.7
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/go-logr/logr v1.4.2
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v45 v45.2.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/konflux-ci/application-api v0.0.0-20240527211352-be061932d497
