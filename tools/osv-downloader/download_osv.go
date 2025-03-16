@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/go-github/v45/github"
+	"github.com/google/go-github/v69/github"
 )
 
 // Download and extract the upstream OSV database
