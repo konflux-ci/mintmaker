@@ -93,7 +93,6 @@
           "commitMessageTopic": "{{{groupName}}}"
         },
         "commitMessageTopic": "Konflux references",
-        "semanticCommits": "enabled",
         "prBodyColumns": [
           "Package",
           "Change",
