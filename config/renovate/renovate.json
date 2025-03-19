@@ -104,15 +104,6 @@
         "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
         "recreateWhen": "always",
         "rebaseWhen": "behind-base-branch"
-      },
-      {
-        "matchManagers": [
-          "gomod"
-        ],
-        "matchDepTypes": [
-          "indirect"
-        ],
-        "enabled": true
       }
     ],
     "schedule": [
@@ -357,6 +348,17 @@
     "postUpdateOptions": [
       "gomodUpdateImportPaths",
       "gomodTidy"
+    ],
+    "packageRules": [
+      {
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchDepTypes": [
+          "indirect"
+        ],
+        "enabled": true
+      }
     ]
   },
   "ocb": {
