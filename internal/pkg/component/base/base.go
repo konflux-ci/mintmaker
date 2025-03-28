@@ -23,13 +23,13 @@ import (
 	"strings"
 	"sync"
 
-	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
+
+	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
 )
 
 var (
@@ -48,7 +48,6 @@ type BaseComponent struct {
 	// Temporary field to make the implementation easy, it's part of GitURL, so they're duplicated
 	Repository string
 	Branch     string
-	Timestamp  int64
 }
 
 func (c *BaseComponent) GetName() string {
@@ -77,10 +76,6 @@ func (c *BaseComponent) GetGitURL() string {
 
 func (c *BaseComponent) GetRepository() string {
 	return c.Repository
-}
-
-func (c *BaseComponent) GetTimestamp() int64 {
-	return c.Timestamp
 }
 
 type HostRule map[string]string

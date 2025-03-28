@@ -19,16 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"strconv"
 	"time"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
-	"github.com/konflux-ci/mintmaker/internal/pkg/component"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	"github.com/konflux-ci/mintmaker/internal/pkg/tekton"
-	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
-	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +32,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/pkg/component"
+	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	"github.com/konflux-ci/mintmaker/internal/pkg/tekton"
+	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
@@ -145,8 +147,8 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 		return nil, err
 	}
 
-	timestamp := time.Now().Unix()
-	name := fmt.Sprintf("renovate-image-pull-secrets-%d-%s", timestamp, utils.RandomString(5))
+	timestamp := time.Now().UTC().Format("01021504") // in MMDDhhmm format
+	name := fmt.Sprintf("renovate-image-pull-secrets-%s-%s", timestamp, utils.RandomString(5))
 
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -167,7 +169,7 @@ func (r *DependencyUpdateCheckReconciler) createMergedPullSecret(ctx context.Con
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitComponent, ctx context.Context, registrySecret *corev1.Secret) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp component.GitComponent, ctx context.Context, registrySecret *corev1.Secret) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
@@ -181,8 +183,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 			}
 		}
 	}()
-
-	name := fmt.Sprintf("renovate-%d-%s", comp.GetTimestamp(), utils.RandomString(8))
 
 	renovateConfig, err := comp.GetRenovateConfig(registrySecret)
 	if err != nil {
@@ -252,14 +252,13 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(comp component.GitCo
 	// Creating the pipelineRun definition
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
-			"mintmaker.appstudio.redhat.com/application":         comp.GetApplication(),
-			"mintmaker.appstudio.redhat.com/component":           comp.GetName(),
-			"mintmaker.appstudio.redhat.com/namespace":           comp.GetNamespace(),
-			"mintmaker.appstudio.redhat.com/git-platform":        comp.GetPlatform(), // (github, gitlab)
-			"mintmaker.appstudio.redhat.com/git-host":            comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
-			"mintmaker.appstudio.redhat.com/reconcile-timestamp": strconv.FormatInt(comp.GetTimestamp(), 10),
+			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
+			"mintmaker.appstudio.redhat.com/component":    comp.GetName(),
+			"mintmaker.appstudio.redhat.com/namespace":    comp.GetNamespace(),
+			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
+			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 		}).
-        WithTimeouts(nil)
+		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
 
 	cmItems := []corev1.KeyToPath{
@@ -455,9 +454,9 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	// Track components for which we already created a PipelineRun
 	processedComponents := make([]string, 0)
 
-	timestamp := time.Now().UTC().Unix()
+	timestamp := time.Now().UTC().Format("01021504") // in MMDDhhmm format
 	for _, appstudioComponent := range componentList {
-		comp, err := component.NewGitComponent(&appstudioComponent, timestamp, r.Client, ctx)
+		comp, err := component.NewGitComponent(&appstudioComponent, r.Client, ctx)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("failed to handle component: %s", appstudioComponent.Name))
 			continue
@@ -479,7 +478,8 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 
 		log.Info(fmt.Sprintf("creating pending PipelineRun for %s", key))
-		pipelinerun, err := r.createPipelineRun(comp, ctx, registrySecret)
+		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
+		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx, registrySecret)
 		if err != nil {
 			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
 		} else {

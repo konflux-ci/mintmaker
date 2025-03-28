@@ -21,14 +21,16 @@ import (
 	"net/url"
 	"strings"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
-	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
-	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 	"github.com/xanzy/go-gitlab"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+
+	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
+	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
+	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
 
 //TODO: doc about only supporting GitHub with the installed GitHub App
@@ -44,7 +46,7 @@ type Repository struct {
 	Repository   string
 }
 
-func NewComponent(comp *appstudiov1alpha1.Component, timestamp int64, client client.Client, ctx context.Context) (*Component, error) {
+func NewComponent(comp *appstudiov1alpha1.Component, client client.Client, ctx context.Context) (*Component, error) {
 	giturl := comp.Spec.Source.GitSource.URL
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
@@ -69,7 +71,6 @@ func NewComponent(comp *appstudiov1alpha1.Component, timestamp int64, client cli
 			Host:        host,
 			GitURL:      giturl,
 			Repository:  repository,
-			Timestamp:   timestamp,
 			Branch:      comp.Spec.Source.GitSource.Revision,
 		},
 		client: client,

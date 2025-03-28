@@ -94,7 +94,6 @@ var _ = Describe("PipelineRun Controller", FlakeAttempts(5), func() {
 			MintMakerGitPlatformLabel:        "github",
 			MintMakerComponentNameLabel:      "testcomp",
 			MintMakerComponentNamespaceLabel: "testnamespace",
-			MintMakerReconcileTimestampLabel: "01234",
 		}
 
 		_ = BeforeEach(func() {

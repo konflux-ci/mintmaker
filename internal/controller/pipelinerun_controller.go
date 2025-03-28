@@ -18,12 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strconv"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,12 +28,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+
+	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
+	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
 var (
 	MaxSimultaneousPipelineRuns      = 20
 	MintMakerGitPlatformLabel        = "mintmaker.appstudio.redhat.com/git-platform"
-	MintMakerReconcileTimestampLabel = "mintmaker.appstudio.redhat.com/reconcile-timestamp"
 	MintMakerComponentNameLabel      = "mintmaker.appstudio.redhat.com/component"
 	MintMakerComponentNamespaceLabel = "mintmaker.appstudio.redhat.com/namespace"
 )
@@ -144,12 +145,7 @@ func (r *PipelineRunReconciler) startPipelineRun(plr tektonv1.PipelineRun, ctx c
 		return false
 	}
 
-	timestamp, err := strconv.ParseInt(plr.Labels[MintMakerReconcileTimestampLabel], 10, 64)
-	if err != nil {
-		return false
-	}
-
-	ghComponent, err = github.NewComponent(&component, timestamp, r.Client, ctx)
+	ghComponent, err = github.NewComponent(&component, r.Client, ctx)
 	if err != nil {
 		return false
 	}
