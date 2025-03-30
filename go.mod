@@ -13,7 +13,7 @@ require (
 	github.com/konflux-ci/application-api v0.0.0-20240812090716-e7eb2ecfb409
 	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/onsi/gomega v1.36.2
-	github.com/tektoncd/pipeline v0.69.1
+	github.com/tektoncd/pipeline v0.70.0
 	github.com/xanzy/go-gitlab v0.115.0
 	golang.org/x/oauth2 v0.28.0
 	k8s.io/api v0.32.3
