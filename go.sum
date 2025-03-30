@@ -760,8 +760,8 @@ k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff h1:/usPimJzUKKu+m+TE36gUy
 k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff/go.mod h1:5jIi+8yX4RIb8wk3XwBo5Pq2ccx4FP10ohkbSKCZoK8=
 k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e h1:KqK5c/ghOm8xkHYhlodbp6i6+r+ChV2vuAuVRdFbLro=
 k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-knative.dev/pkg v0.0.0-20250312035536-b7bbf4be5dbd h1:KXG6bACwjKSZcT0JxyQDVYLcDPSip+7l6sVULeITi7k=
-knative.dev/pkg v0.0.0-20250312035536-b7bbf4be5dbd/go.mod h1:OuszA8pcsXmO+Pp4QCtD10ph6tjRPFN+LrF/XgAMDb8=
+knative.dev/pkg v0.0.0-20250326102644-9f3e60a9244c h1:6IZwH1QHGfWlmfdy7svgDCPhRqWpisWK/Gcp8wdAwE0=
+knative.dev/pkg v0.0.0-20250326102644-9f3e60a9244c/go.mod h1:gx7Pp9NPcKYApNhR8m0KSOeg71pqhwPWhuhUJ6xCa2g=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
