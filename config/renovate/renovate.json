@@ -122,6 +122,27 @@
       "before 5am"
     ]
   },
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "registry.access.redhat.com/rhel",
+        "registry.access.redhat.com/rhel-atomic",
+        "registry.access.redhat.com/rhel-init",
+        "registry.access.redhat.com/rhel-minimal",
+        "registry.access.redhat.com/rhceph/**",
+        "registry.access.redhat.com/rhgs3/**",
+        "registry.access.redhat.com/rhel7**",
+        "registry.access.redhat.com/rhel8/**",
+        "registry.access.redhat.com/rhel9/**",
+        "registry.access.redhat.com/rhscl/**",
+        "registry.access.redhat.com/ubi*{,/}**",
+        "redhat/**",
+        "registry.redhat.io/*",
+        "registry.stage.redhat.io/*"
+      ],
+      "versioning": "redhat"
+    }
+  ],
   "rpm": {
     "enabled": true,
     "packageRules": [
