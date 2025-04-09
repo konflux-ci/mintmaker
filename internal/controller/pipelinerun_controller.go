@@ -35,6 +35,7 @@ import (
 
 	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	mmmetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 )
 
 var (
@@ -194,6 +195,7 @@ func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existin
 			success := r.startPipelineRun(pipelineRun, ctx)
 			if success {
 				numLaunched += 1
+				mmmetrics.CountScheduledRuns()
 			}
 			if numLaunched == numToLaunch {
 				break
