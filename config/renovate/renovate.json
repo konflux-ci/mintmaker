@@ -153,7 +153,9 @@
         "commitMessageExtra": "",
         "matchManagers": [
           "rpm"
-        ]
+        ],
+        "recreateWhen": "always",
+        "rebaseWhen": "behind-base-branch"
       }
     ],
     "vulnerabilityAlerts": {
