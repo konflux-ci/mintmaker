@@ -213,6 +213,14 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 													Name:  "DNF_VAR_SSL_CLIENT_CERT",
 													Value: "/workspace/shared-data/rpm-certs/cert.pem",
 												},
+												{
+													Name:  "RENOVATE_REDIS_PREFIX",
+													Value: "renovate-global-cache",
+												},
+												{
+													Name:  "RENOVATE_REDIS_URL",
+													Value: "redis://redis:6379",
+												},
 											},
 										},
 									},
