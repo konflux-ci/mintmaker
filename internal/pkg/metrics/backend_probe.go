@@ -1,4 +1,4 @@
-package mmmetrics
+package mintmakermetrics
 
 import (
 	"context"

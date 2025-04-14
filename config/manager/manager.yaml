@@ -5,6 +5,7 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: mintmaker
     app.kubernetes.io/managed-by: kustomize
+    openshift.io/cluster-monitoring: "true"
   name: system
 ---
 apiVersion: apps/v1
