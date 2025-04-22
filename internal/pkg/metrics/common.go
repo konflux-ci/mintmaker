@@ -10,18 +10,21 @@ import (
 )
 
 var (
-	probe                       *AvailabilityProbe
-	controllerAvailabilityGauge = prometheus.NewGauge(
+	probeSuccess              *AvailabilityProbe
+	probeFailure              *AvailabilityProbe
+	controllerAvailabilityVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Subsystem: "mintmaker",
-			Name:      "available",
-			Help:      "Number of scheduled MintMaker jobs",
-		})
+			Name:      "availability",
+			Help:      "Number of successfully scheduled MintMaker PipelineRuns and failures",
+		},
+		[]string{"status"}, // "success" or "failure"
+	)
 )
 
 func RegisterCommonMetrics(ctx context.Context, registerer prometheus.Registerer) error {
 	log := logr.FromContextOrDiscard(ctx)
-	if err := registerer.Register(controllerAvailabilityGauge); err != nil {
+	if err := registerer.Register(controllerAvailabilityVec); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
 	}
 	ticker := time.NewTicker(10 * time.Minute)
@@ -43,16 +46,27 @@ func RegisterCommonMetrics(ctx context.Context, registerer prometheus.Registerer
 
 func checkProbes(ctx context.Context) {
 	// Set availability metric based on contoller events (scheduled PipelineRuns)
-	events := (*probe).CheckEvents(ctx)
-	controllerAvailabilityGauge.Set(events)
+	successEvents := (*probeSuccess).CheckEvents(ctx)
+	failureEvents := (*probeFailure).CheckEvents(ctx)
+	controllerAvailabilityVec.WithLabelValues("success").Set(successEvents)
+	controllerAvailabilityVec.WithLabelValues("failure").Set(failureEvents)
+
 }
 
-func CountScheduledRuns() {
-	if probe == nil {
+func CountScheduledRunSuccess() {
+	if probeSuccess == nil {
 		watcher := NewBackendProbe()
-		probe = &watcher
+		probeSuccess = &watcher
 	}
-	(*probe).AddEvent()
+	(*probeSuccess).AddEvent()
+}
+
+func CountScheduledRunFailure() {
+	if probeFailure == nil {
+		watcher := NewBackendProbe()
+		probeFailure = &watcher
+	}
+	(*probeFailure).AddEvent()
 }
 
 type AvailabilityProbe interface {

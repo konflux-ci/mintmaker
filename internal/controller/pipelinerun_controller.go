@@ -195,7 +195,9 @@ func (r *PipelineRunReconciler) launchUpToNPipelineRuns(numToLaunch int, existin
 			success := r.startPipelineRun(pipelineRun, ctx)
 			if success {
 				numLaunched += 1
-				mintmakermetrics.CountScheduledRuns()
+				mintmakermetrics.CountScheduledRunSuccess()
+			} else {
+				mintmakermetrics.CountScheduledRunFailure()
 			}
 			if numLaunched == numToLaunch {
 				break
