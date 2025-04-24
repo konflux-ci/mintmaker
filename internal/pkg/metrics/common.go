@@ -46,10 +46,14 @@ func RegisterCommonMetrics(ctx context.Context, registerer prometheus.Registerer
 
 func checkProbes(ctx context.Context) {
 	// Set availability metric based on contoller events (scheduled PipelineRuns)
-	successEvents := (*probeSuccess).CheckEvents(ctx)
-	failureEvents := (*probeFailure).CheckEvents(ctx)
-	controllerAvailabilityVec.WithLabelValues("success").Set(successEvents)
-	controllerAvailabilityVec.WithLabelValues("failure").Set(failureEvents)
+	if probeSuccess != nil {
+		successEvents := (*probeSuccess).CheckEvents(ctx)
+		controllerAvailabilityVec.WithLabelValues("success").Set(successEvents)
+	}
+	if probeFailure != nil {
+		failureEvents := (*probeFailure).CheckEvents(ctx)
+		controllerAvailabilityVec.WithLabelValues("failure").Set(failureEvents)
+	}
 
 }
 
