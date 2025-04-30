@@ -5,14 +5,13 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: mintmaker
     app.kubernetes.io/managed-by: kustomize
-    openshift.io/cluster-monitoring: "true"
-  name: system
+  name: mintmaker
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: mintmaker
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: mintmaker
@@ -71,8 +70,8 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-          - --metrics-bind-address=:8080
           - --metrics-secure=false
+          - --metrics-bind-address=:8080
         image: controller:latest
         name: manager
         env:

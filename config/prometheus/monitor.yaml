@@ -7,12 +7,12 @@ metadata:
     app.kubernetes.io/name: mintmaker
     app.kubernetes.io/managed-by: kustomize
   name: controller-manager-metrics-monitor
-  namespace: system
+  namespace: mintmaker
 spec:
   endpoints:
     - path: /metrics
-      port: https # Ensure this is the name of the port that exposes HTTPS metrics
-      scheme: https
+      port: http-metrics # Ensure this is the name of the port that exposes HTTPS metrics
+      scheme: http
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
         # TODO(user): The option insecureSkipVerify: true is not recommended for production since it disables

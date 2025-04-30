@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: mintmaker
     app.kubernetes.io/managed-by: kustomize
   name: allow-metrics-traffic
-  namespace: system
+  namespace: mintmaker
 spec:
   podSelector:
     matchLabels:
