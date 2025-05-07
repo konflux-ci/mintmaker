@@ -13,7 +13,7 @@ spec:
     - path: /metrics
       port: http-metrics # Ensure this is the name of the port that exposes HTTPS metrics
       scheme: http
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      #bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
         # TODO(user): The option insecureSkipVerify: true is not recommended for production since it disables
         # certificate verification. This poses a significant security risk by making the system vulnerable to
