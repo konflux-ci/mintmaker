@@ -12,13 +12,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: controller-manager
-  namespace: mintmaker
+  namespace: system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: manager-rolebinding
-  namespace: mintmaker
+  namespace: system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
