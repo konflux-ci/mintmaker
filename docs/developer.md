@@ -42,19 +42,9 @@ same job might not be possible from the UI):
 ## Release process
 
 > [!NOTE]
-> The release process is now automated. After merging PRs into either
-> konflux-ci/mintmaker or konflux-ci/mintmaker-renovate-image, a PR
-> for updating stage will open in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repository
-> with the title `mintmaker update` or `mintmaker-renovate-image update`.
-> 
-> After merging the stage PRs, a PR titled
->  `Promoting component mintmaker from stage to prod` will open automatically
-> to update the digests in production.
-> 
-> All you have to do now is to check that the digests are the ones
-> you intend to release and that the images exist in their respective Quay
-> repositories.
-> 
+> The release process is also automated. Please refer to the
+[automated-release-workflow](automated-release-workflow.md) for more details.
+>
 > The following text describes the manual release process, which can
 > still occasionally be helpful.
 
