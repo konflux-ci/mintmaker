@@ -177,7 +177,7 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												},
 												Limits: corev1.ResourceList{
 													"cpu":    resource.MustParse("300m"),
-													"memory": resource.MustParse("2Gi"),
+													"memory": resource.MustParse("2.5Gi"),
 												},
 											},
 											Env: []corev1.EnvVar{
