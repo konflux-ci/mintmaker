@@ -162,6 +162,7 @@
         "matchManagers": [
           "rpm"
         ],
+        "separateMajorMinor": false,
         "recreateWhen": "always",
         "rebaseWhen": "behind-base-branch"
       }
