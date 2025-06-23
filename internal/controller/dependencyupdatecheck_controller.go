@@ -39,6 +39,7 @@ import (
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/pkg/component"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	"github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
@@ -48,6 +49,7 @@ import (
 type DependencyUpdateCheckReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
+	Config config.ControllerConfig
 }
 
 func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
@@ -494,7 +496,6 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DependencyUpdateCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// we are monitoring the creation of DependencyUpdateCheck
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mmv1alpha1.DependencyUpdateCheck{}).
 		WithEventFilter(predicate.Funcs{

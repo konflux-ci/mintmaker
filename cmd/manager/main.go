@@ -38,6 +38,7 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/controller"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
@@ -148,6 +149,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	if err := config.InitGlobalConfig(ctx, mgr.GetClient()); err != nil {
+		setupLog.Error(err, "Something went wrong with loading ConfigMap, proceeding with default config")
+	}
+
 	if err = (&controller.DependencyUpdateCheckReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -159,6 +165,7 @@ func main() {
 	if err = (&controller.PipelineRunReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Config: config.GetConfig(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PipelineRun")
 		os.Exit(1)
@@ -173,7 +180,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
 	if err := mintmakermetrics.RegisterCommonMetrics(ctx, metrics.Registry); err != nil {
 		setupLog.Error(err, "unable to register common metrics")
 		os.Exit(1)

@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	ghcomponent "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	tekton "github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 )
@@ -51,6 +52,8 @@ func teardownPipelineRuns() {
 }
 
 var _ = Describe("PipelineRun Controller", FlakeAttempts(5), func() {
+
+	MaxSimultaneousPipelineRuns := config.GetTestConfig().PipelineRunConfig.MaxParallelPipelineruns
 
 	Context("When reconciling pipelineruns", func() {
 

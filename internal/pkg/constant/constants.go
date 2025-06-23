@@ -14,8 +14,6 @@
 
 package constant
 
-import "time"
-
 const (
 	// The namespace name where mintmaker is running
 	MintMakerNamespaceName = "mintmaker"
@@ -26,8 +24,4 @@ const (
 
 	RenovateImageEnvName    = "RENOVATE_IMAGE"
 	DefaultRenovateImageURL = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
-
-	GhTokenValidity       = 1 * time.Hour
-	GhTokenUsageWindow    = 30 * time.Minute
-	GhTokenRenewThreshold = GhTokenValidity - GhTokenUsageWindow
 )

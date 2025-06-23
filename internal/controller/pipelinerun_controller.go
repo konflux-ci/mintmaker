@@ -34,12 +34,12 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
+	config "github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 )
 
 var (
-	MaxSimultaneousPipelineRuns      = 40
 	MintMakerGitPlatformLabel        = "mintmaker.appstudio.redhat.com/git-platform"
 	MintMakerComponentNameLabel      = "mintmaker.appstudio.redhat.com/component"
 	MintMakerComponentNamespaceLabel = "mintmaker.appstudio.redhat.com/namespace"
@@ -65,6 +65,7 @@ func countRunningPipelineRuns(existingPipelineRuns tektonv1.PipelineRunList) (in
 type PipelineRunReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
+	Config *config.ControllerConfig
 }
 
 func (r *PipelineRunReconciler) listExistingPipelineRuns(ctx context.Context, req ctrl.Request) (tektonv1.PipelineRunList, error) {
@@ -230,7 +231,7 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	githubPipelineRuns := filterPipelineRunListWithLabel(existingPipelineRuns, "github")
 
 	// Launch up to N pipelineruns, 'github' ones first
-	numToLaunch := MaxSimultaneousPipelineRuns - numRunning
+	numToLaunch := r.Config.PipelineRunConfig.MaxParallelPipelineruns - numRunning
 	err = r.launchUpToNPipelineRuns(numToLaunch, githubPipelineRuns, ctx)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -241,7 +242,7 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Error(err, "Unable to count running pipelineruns")
 		return ctrl.Result{}, err
 	}
-	numToLaunch = MaxSimultaneousPipelineRuns - numRunning
+	numToLaunch = r.Config.PipelineRunConfig.MaxParallelPipelineruns - numRunning
 	err = r.launchUpToNPipelineRuns(numToLaunch, existingPipelineRuns, ctx)
 	if err != nil {
 		return ctrl.Result{}, err
