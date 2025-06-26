@@ -401,7 +401,7 @@
   "forkProcessing": "enabled",
   "allowedCommands": [
     "^rpm-lockfile-prototype rpms.in.yaml$",
-    "^pipeline-migration-tool migrate -u '\\[\\{\"depName\": \"\\{\\{\\{depName\\}\\}\\}\", \"currentValue\": \"\\{\\{\\{currentValue\\}\\}\\}\", \"currentDigest\": \"\\{\\{\\{currentDigest\\}\\}\\}\", \"newValue\": \"\\{\\{\\{newValue\\}\\}\\}\", \"newDigest\": \"\\{\\{\\{newDigest\\}\\}\\}\", \"packageFile\": \"\\{\\{\\{packageFile\\}\\}\\}\", \"parentDir\": \"\\{\\{\\{parentDir\\}\\}\\}\", \"depTypes\": \\[\\{\\{#each depTypes\\}\\}\"\\{\\{\\{this\\}\\}\\}\"\\{\\{#unless @last\\}\\},\\{\\{\\/unless\\}\\}\\{\\{\\/each\\}\\}\\]\\}\\]'$"
+    "^pipeline-migration-tool migrate -u '\\[\\{\"depName\": \".*?\", \"currentValue\": \".*?\", \"currentDigest\": \".*?\", \"newValue\": \".*?\", \"newDigest\": \".*?\", \"packageFile\": \".*?\", \"parentDir\": \".*?\", \"depTypes\": \\[(?:(?:\"[^\"]*\")(?:,)?)\\]\\}\\]'$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false,
