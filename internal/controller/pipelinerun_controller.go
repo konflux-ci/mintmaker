@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -225,8 +226,22 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
 				if oldPipelineRun, ok := updateEvent.ObjectOld.(*tektonv1.PipelineRun); ok {
 					if newPipelineRun, ok := updateEvent.ObjectNew.(*tektonv1.PipelineRun); ok {
-						return oldPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() &&
-							!newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
+						if oldPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() &&
+							!newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() {
+							if newPipelineRun.Status.CompletionTime != nil {
+								log := ctrl.Log.WithName("PipelineRunController")
+								log.Info(
+									fmt.Sprintf("PipelineRun finished: %s", newPipelineRun.Name),
+									"completionTime",
+									newPipelineRun.Status.CompletionTime.Format(time.RFC3339),
+									"success",
+									newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsTrue(),
+									"reason",
+									newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason(),
+								)
+							}
+							return true
+						}
 					}
 				}
 				return false
