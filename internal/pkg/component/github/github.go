@@ -34,7 +34,7 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
 
@@ -176,7 +176,7 @@ func (c *Component) GetToken() (string, error) {
 	}
 
 	tokenKey := fmt.Sprintf("installation_%d", installationID)
-
+	cfg := config.GetConfig().GlobalConfig
 	if ghAppInstallationTokenCache.entries == nil {
 		ghAppInstallationTokenCache.entries = make(map[string]TokenInfo)
 	}
@@ -200,7 +200,7 @@ func (c *Component) GetToken() (string, error) {
 		return "", fmt.Errorf("error getting installation token: %w", err)
 	}
 	tokenInfo := TokenInfo{
-		Token: token, ExpiresAt: time.Now().Add(GhTokenValidity),
+		Token: token, ExpiresAt: time.Now().Add(cfg.GhTokenValidity),
 	}
 	ghAppInstallationTokenCache.Set(tokenKey, tokenInfo)
 
