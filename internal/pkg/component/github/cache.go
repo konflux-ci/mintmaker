@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 )
 
 // StaleAllowedCache refreshes data in the background while optionally
@@ -140,9 +140,9 @@ func (c *TokenCache) Get(key string) (TokenInfo, bool) {
 	if !exists {
 		return TokenInfo{}, false
 	}
-
+	cfg := config.GetConfig().GlobalConfig
 	// when token is close to expiring, we can't use it
-	if time.Until(entry.ExpiresAt) < GhTokenRenewThreshold {
+	if time.Until(entry.ExpiresAt) < cfg.GhTokenRenewThreshold {
 		return TokenInfo{}, false
 	}
 
