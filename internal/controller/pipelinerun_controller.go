@@ -151,11 +151,6 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log := ctrllog.FromContext(ctx).WithName("PipelineRunController")
 	ctx = ctrllog.IntoContext(ctx, log)
 
-	// Only process events in the MintMaker namespace
-	if req.Namespace != MintMakerNamespaceName {
-		return ctrl.Result{}, nil
-	}
-
 	// Get all PipelineRuns in the namespace
 	var pipelineRunList tektonv1.PipelineRunList
 	if err := r.Client.List(ctx, &pipelineRunList, client.InNamespace(req.Namespace)); err != nil {
@@ -214,22 +209,26 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tektonv1.PipelineRun{}).
 		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(createEvent event.CreateEvent) bool {
-				if pipelineRun, ok := createEvent.Object.(*tektonv1.PipelineRun); ok {
-					return pipelineRun.Spec.Status == tektonv1.PipelineRunSpecStatusPending
+			CreateFunc: func(e event.CreateEvent) bool {
+				if e.Object.GetNamespace() != MintMakerNamespaceName {
+					return false
+				}
+				if pipelineRun, ok := e.Object.(*tektonv1.PipelineRun); ok {
+					return pipelineRun.IsPending()
 				}
 				return false
 			},
-			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			DeleteFunc: func(e event.DeleteEvent) bool {
 				return false
 			},
-			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				if oldPipelineRun, ok := updateEvent.ObjectOld.(*tektonv1.PipelineRun); ok {
-					if newPipelineRun, ok := updateEvent.ObjectNew.(*tektonv1.PipelineRun); ok {
-						if oldPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() &&
-							!newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() {
-							if newPipelineRun.Namespace == MintMakerNamespaceName &&
-								newPipelineRun.Status.CompletionTime != nil {
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				if e.ObjectNew.GetNamespace() != MintMakerNamespaceName {
+					return false
+				}
+				if oldPipelineRun, ok := e.ObjectOld.(*tektonv1.PipelineRun); ok {
+					if newPipelineRun, ok := e.ObjectNew.(*tektonv1.PipelineRun); ok {
+						if !oldPipelineRun.IsDone() && newPipelineRun.IsDone() {
+							if newPipelineRun.Status.CompletionTime != nil {
 								log := ctrl.Log.WithName("PipelineRunController")
 								log.Info(
 									fmt.Sprintf("PipelineRun finished: %s", newPipelineRun.Name),
@@ -247,7 +246,7 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 				return false
 			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
+			GenericFunc: func(e event.GenericEvent) bool {
 				return false
 			},
 		}).
