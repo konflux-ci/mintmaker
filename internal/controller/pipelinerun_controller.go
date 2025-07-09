@@ -228,7 +228,8 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if newPipelineRun, ok := updateEvent.ObjectNew.(*tektonv1.PipelineRun); ok {
 						if oldPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() &&
 							!newPipelineRun.Status.GetCondition(apis.ConditionSucceeded).IsUnknown() {
-							if newPipelineRun.Status.CompletionTime != nil {
+							if newPipelineRun.Namespace == MintMakerNamespaceName &&
+								newPipelineRun.Status.CompletionTime != nil {
 								log := ctrl.Log.WithName("PipelineRunController")
 								log.Info(
 									fmt.Sprintf("PipelineRun finished: %s", newPipelineRun.Name),
