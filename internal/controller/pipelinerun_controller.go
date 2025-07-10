@@ -36,12 +36,12 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 )
 
 var (
-	MaxSimultaneousPipelineRuns      = 40
 	MintMakerGitPlatformLabel        = "mintmaker.appstudio.redhat.com/git-platform"
 	MintMakerComponentNameLabel      = "mintmaker.appstudio.redhat.com/component"
 	MintMakerComponentNamespaceLabel = "mintmaker.appstudio.redhat.com/namespace"
@@ -51,6 +51,7 @@ var (
 type PipelineRunReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
+	Config *config.ControllerConfig
 }
 
 // updatePipelineRunState updates the status of a PipelineRun
@@ -185,7 +186,7 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	})
 
 	// Calculate how many more runs we can start
-	availableSlots := MaxSimultaneousPipelineRuns - runningCount
+	availableSlots := r.Config.PipelineRunConfig.MaxParallelPipelineruns - runningCount
 
 	// Start as many pending runs as possible, up to the maximum allowed
 	if availableSlots > 0 {
