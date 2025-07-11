@@ -205,20 +205,29 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 	}
 	resources = append(resources, renovateConfigMap)
 
-	// Create Secret for Renovate token (the repository access token)
-	renovateToken, err := comp.GetToken()
-	if err != nil {
-		return nil, err
-	}
+	// Secret for Renovate token (repository access token)
 	renovateSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: MintMakerNamespaceName,
 		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"renovate-token": renovateToken,
-		},
+		Type:       corev1.SecretTypeOpaque,
+		StringData: map[string]string{},
+	}
+
+	// For GitHub repositories, we intentionally do not set the "renovate-token"
+	// key. GitHub tokens generated from the Konflux GitHub application have a
+	// maximum lifespan of 1 hour. Instead of generating a token that might expire
+	// before the pipelinerun starts, we wait for events with "FailedMount" reason,
+	// which happens when pod try to mount the secret but can't find the key in
+	// secret. Then we populate the token in the event controller at that time to
+	// ensure it's valid for the pipelinerun execution.
+	if comp.GetPlatform() != "github" {
+		renovateToken, err := comp.GetToken()
+		if err != nil {
+			return nil, err
+		}
+		renovateSecret.StringData["renovate-token"] = renovateToken
 	}
 
 	if err := r.Client.Create(ctx, renovateSecret); err != nil {

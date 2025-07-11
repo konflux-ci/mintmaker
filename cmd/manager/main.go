@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/controller"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
@@ -161,6 +162,14 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PipelineRun")
+		os.Exit(1)
+	}
+
+	if err = (&controller.EventReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Event")
 		os.Exit(1)
 	}
 

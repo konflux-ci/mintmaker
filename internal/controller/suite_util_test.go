@@ -32,13 +32,6 @@ import (
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
-const (
-	// timeout is used as a limit until condition become true
-	// Usually used in Eventually statements
-	timeout  = time.Second * 15
-	interval = time.Millisecond * 250
-)
-
 var testPrivateKey = "-----BEGIN PRIVATE KEY-----\n" +
 	"MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0lZNSLqX1n2aO" +
 	"loffn3rBL2+3Mm/GnjkWVQz76TS3KO7RSf4Det017H80XUumx3fT26rZ+wgpN8fi" +

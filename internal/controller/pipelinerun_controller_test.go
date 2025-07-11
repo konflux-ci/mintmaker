@@ -22,12 +22,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ghcomponent "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	tekton "github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 )
@@ -59,7 +56,7 @@ func teardownPipelineRuns() {
 	Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(0))
 }
 
-var _ = Describe("PipelineRun Controller", FlakeAttempts(5), func() {
+var _ = Describe("PipelineRun Controller", func() {
 
 	Context("When reconciling pipelineruns", func() {
 
@@ -119,93 +116,6 @@ var _ = Describe("PipelineRun Controller", FlakeAttempts(5), func() {
 		})
 	})
 
-	Context("When handling GitHub token refresh", func() {
-		var origGetTokenFn func() (string, error)
-		originalMaxSimultaneousPipelineRuns := MaxSimultaneousPipelineRuns
-		labels := map[string]string{
-			MintMakerGitPlatformLabel:        "github",
-			MintMakerComponentNameLabel:      "testcomp",
-			MintMakerComponentNamespaceLabel: "testnamespace",
-		}
-
-		_ = BeforeEach(func() {
-			MaxSimultaneousPipelineRuns = 1
-			createNamespace(MintMakerNamespaceName)
-			createNamespace("testnamespace")
-			origGetTokenFn = ghcomponent.GetTokenFn
-			ghcomponent.GetTokenFn = func() (string, error) {
-				return "tokenstring", nil
-			}
-
-			createComponent(
-				types.NamespacedName{
-					Name: labels[MintMakerComponentNameLabel], Namespace: labels[MintMakerComponentNamespaceLabel],
-				}, "app", "https://github.com/testcomp.git", "gitrevision", "gitsourcecontext",
-			)
-
-			secretData := map[string]string{
-				"github-application-id": "1234567890",
-				"github-private-key":    testPrivateKey,
-			}
-			createSecret(
-				types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"}, secretData,
-			)
-			configMapData := map[string]string{"renovate.json": "{}"}
-			createSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pplnr1"}, configMapData)
-		})
-
-		_ = AfterEach(func() {
-			MaxSimultaneousPipelineRuns = originalMaxSimultaneousPipelineRuns
-			ghcomponent.GetTokenFn = origGetTokenFn
-			deleteComponent(types.NamespacedName{
-				Name: labels[MintMakerComponentNameLabel], Namespace: labels[MintMakerComponentNamespaceLabel],
-			})
-			deleteSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"})
-			deleteSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pplnr1"})
-
-			teardownPipelineRuns()
-		})
-
-		It("should renew github token if it became old", func() {
-			// Set up initial token in the secret
-			appSecret := corev1.Secret{}
-			Expect(
-				k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pplnr1"}, &appSecret),
-			).To(Succeed())
-			originalAppSecret := appSecret.DeepCopy()
-			appSecret.Data = map[string][]byte{
-				"renovate-token": []byte("oldtoken"),
-			}
-			secretPatch := client.MergeFrom(originalAppSecret)
-			Expect(
-				k8sClient.Patch(ctx, &appSecret, secretPatch),
-			).To(Succeed())
-
-			// Create the PipelineRun with GitHub labels
-			setupPipelineRun("pplnr1", labels, 0)
-			Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(1))
-
-			// Verify the token gets updated
-			Eventually(func() []byte {
-				updatedSecret := &corev1.Secret{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pplnr1"}, updatedSecret)
-				if err != nil {
-					return []byte{}
-				}
-				return updatedSecret.Data["renovate-token"]
-			}, timeout, interval).Should(Equal([]byte("tokenstring")))
-
-			// Verify the PipelineRun is started
-			Eventually(func() tektonv1.PipelineRunSpecStatus {
-				pipelineRun := &tektonv1.PipelineRun{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pplnr1"}, pipelineRun)
-				if err != nil {
-					return ""
-				}
-				return pipelineRun.Spec.Status
-			}, timeout, interval).Should(Equal(tektonv1.PipelineRunSpecStatus("")))
-		})
-	})
 	Context("When a pipelinerun finishes", func() {
 
 		var logBuffer bytes.Buffer
