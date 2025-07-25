@@ -44,10 +44,10 @@ type GitComponent interface {
 }
 
 func NewGitComponent(comp *appstudiov1alpha1.Component, client client.Client, ctx context.Context) (GitComponent, error) {
-    // First check if source url exists and is properly defined
-    if comp.Spec.Source.GitSource == nil || comp.Spec.Source.GitSource.URL == "" {
-        return nil, fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
-    }
+	// First check if source url exists and is properly defined
+	if comp.Spec.Source.GitSource == nil || comp.Spec.Source.GitSource.URL == "" {
+		return nil, fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
+	}
 	platform, err := utils.GetGitPlatform(comp.Spec.Source.GitSource.URL)
 	if err != nil {
 		return nil, err
