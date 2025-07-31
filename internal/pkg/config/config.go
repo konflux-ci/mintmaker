@@ -17,7 +17,6 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"sync"
 	"time"
 
@@ -31,10 +30,6 @@ import (
 
 const ConfigMapName = "mintmaker-controller-configmap"
 
-type PipelineRunConfig struct {
-	MaxParallelPipelineruns int
-}
-
 type GlobalConfig struct {
 	GhTokenValidity       time.Duration
 	GhTokenUsageWindow    time.Duration
@@ -42,8 +37,7 @@ type GlobalConfig struct {
 }
 
 type ControllerConfig struct {
-	GlobalConfig      GlobalConfig
-	PipelineRunConfig PipelineRunConfig
+	GlobalConfig GlobalConfig
 }
 
 var globalConfig *ControllerConfig
@@ -54,15 +48,12 @@ func DefaultConfig() *ControllerConfig {
 	GhTokenUsageWindow := 30 * time.Minute
 
 	return &ControllerConfig{
-		PipelineRunConfig: PipelineRunConfig{MaxParallelPipelineruns: 40},
-
 		GlobalConfig: GlobalConfig{
 			GhTokenValidity:       GhTokenValidity,
 			GhTokenUsageWindow:    GhTokenUsageWindow,
 			GhTokenRenewThreshold: GhTokenValidity - GhTokenUsageWindow,
 		},
 	}
-
 }
 
 func LoadConfig(ctx context.Context, client client.Reader) *ControllerConfig {
@@ -72,10 +63,6 @@ func LoadConfig(ctx context.Context, client client.Reader) *ControllerConfig {
 			GhTokenValidity    string `json:"github-token-validity"`
 			GhTokenUsageWindow string `json:"github-token-usage-window"`
 		} `json:"global"`
-
-		PipelineRun struct {
-			MaxParallelPipelineruns string `json:"max-parallel-pipelineruns"`
-		} `json:"pipelinerun"`
 	}
 
 	defaultConfig := DefaultConfig()
@@ -94,12 +81,6 @@ func LoadConfig(ctx context.Context, client client.Reader) *ControllerConfig {
 	if err := json.Unmarshal([]byte(configMap.Data["config.json"]), &configReader); err != nil {
 		log.Error(err, "Could not unmarshal configuration, using default configuration", "configMap", ConfigMapName)
 		return defaultConfig
-	}
-
-	if parsed, err := strconv.Atoi(configReader.PipelineRun.MaxParallelPipelineruns); err == nil && parsed > 0 {
-		config.PipelineRunConfig.MaxParallelPipelineruns = parsed
-	} else {
-		config.PipelineRunConfig.MaxParallelPipelineruns = defaultConfig.PipelineRunConfig.MaxParallelPipelineruns
 	}
 
 	if parsed, err := time.ParseDuration(configReader.Global.GhTokenValidity); err == nil && parsed > 0 {

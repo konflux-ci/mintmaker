@@ -108,7 +108,6 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 				Namespace: namespace,
 			},
 			Spec: tektonv1.PipelineRunSpec{
-				Status: tektonv1.PipelineRunSpecStatusPending,
 				PipelineSpec: &tektonv1.PipelineSpec{
 					Workspaces: []tektonv1.PipelineWorkspaceDeclaration{
 						{

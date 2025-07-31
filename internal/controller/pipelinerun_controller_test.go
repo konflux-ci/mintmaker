@@ -16,16 +16,13 @@ package controller
 
 import (
 	"bytes"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	tekton "github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 )
@@ -40,12 +37,6 @@ func setupPipelineRun(name string, labels map[string]string, creationTimeOffset 
 		pipelinerun, err = pipelineRunBuilder.Build()
 	}
 	Expect(err).NotTo(HaveOccurred())
-
-	// Set creation timestamp for testing ordering
-	if creationTimeOffset != 0 {
-		pipelinerun.CreationTimestamp = metav1.NewTime(time.Now().Add(-creationTimeOffset))
-	}
-
 	Expect(k8sClient.Create(ctx, pipelinerun)).Should(Succeed())
 }
 
@@ -58,66 +49,6 @@ func teardownPipelineRuns() {
 }
 
 var _ = Describe("PipelineRun Controller", func() {
-
-	MaxSimultaneousPipelineRuns := config.GetTestConfig().PipelineRunConfig.MaxParallelPipelineruns
-
-	Context("When reconciling pipelineruns", func() {
-
-		originalMaxSimultaneousPipelineRuns := MaxSimultaneousPipelineRuns
-
-		_ = BeforeEach(func() {
-			createNamespace(MintMakerNamespaceName)
-			MaxSimultaneousPipelineRuns = 2
-		})
-
-		_ = AfterEach(func() {
-			MaxSimultaneousPipelineRuns = originalMaxSimultaneousPipelineRuns
-			teardownPipelineRuns()
-		})
-
-		It("should successfully launch new pipelineruns based on max limit", func() {
-			// Create 3 PipelineRuns
-			for i := range 3 {
-				pplrName := "pplnr" + strconv.Itoa(i)
-				setupPipelineRun(pplrName, nil, 0)
-			}
-			Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(3))
-
-			// Only MaxSimultaneousPipelineRuns should be started
-			Eventually(func() int {
-				count := 0
-				existingPipelineRuns := listPipelineRuns(MintMakerNamespaceName)
-				for _, pipelineRun := range existingPipelineRuns {
-					if pipelineRun.Spec.Status == "" {
-						count += 1
-					}
-				}
-				return count
-			}, timeout, interval).Should(Equal(MaxSimultaneousPipelineRuns))
-		})
-
-		It("should launch pipelineruns in order of creation time", func() {
-			// Create 3 PipelineRuns with different creation times
-			setupPipelineRun("oldest", nil, 30*time.Minute)
-			setupPipelineRun("middle", nil, 15*time.Minute)
-			setupPipelineRun("newest", nil, 5*time.Minute)
-
-			Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(3))
-
-			// The oldest should be started first, followed by middle
-			Eventually(func() bool {
-				oldest := &tektonv1.PipelineRun{}
-				middle := &tektonv1.PipelineRun{}
-				newest := &tektonv1.PipelineRun{}
-
-				k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "oldest"}, oldest)
-				k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "middle"}, middle)
-				k8sClient.Get(ctx, types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "newest"}, newest)
-
-				return oldest.Spec.Status == "" && middle.Spec.Status == "" && newest.Spec.Status == tektonv1.PipelineRunSpecStatusPending
-			}, timeout, interval).Should(BeTrue())
-		})
-	})
 
 	Context("When a pipelinerun finishes", func() {
 
@@ -132,7 +63,6 @@ var _ = Describe("PipelineRun Controller", func() {
 			setupPipelineRun(plrName, nil, 0)
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, plrLookupKey, plr)).To(Succeed())
-				g.Expect(plr.IsPending()).To(BeFalse())
 			}, timeout, interval).Should(Succeed())
 			GinkgoWriter.TeeTo(&logBuffer)
 		})

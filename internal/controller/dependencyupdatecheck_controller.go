@@ -491,7 +491,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			processedComponents = append(processedComponents, key)
 		}
 
-		log.Info(fmt.Sprintf("creating pending PipelineRun for %s", key))
+		log.Info(fmt.Sprintf("creating PipelineRun for %s", key))
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
 		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx, registrySecret)
 		if err != nil {

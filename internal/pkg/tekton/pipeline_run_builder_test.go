@@ -51,8 +51,9 @@ var _ = Describe("PipelineRun builder", func() {
 			Expect(builder.pipelineRun.ObjectMeta.Namespace).To(Equal(namespace))
 		})
 
-		It("should initialize an empty PipelineRunSpec", func() {
-			Expect(builder.pipelineRun.Spec).To(Equal(tektonv1.PipelineRunSpec{}))
+		It("should initialize PipelineRunSpec with default values", func() {
+			Expect(builder.pipelineRun.Spec.Status).To(Equal(tektonv1.PipelineRunSpecStatus("")))
+			Expect(builder.pipelineRun.Spec.PipelineSpec).ToNot(BeNil())
 		})
 	})
 
