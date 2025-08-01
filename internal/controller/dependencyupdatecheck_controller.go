@@ -46,6 +46,8 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
 
+const InternalSecretLabelName = "appstudio.redhat.com/internal"
+
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
 	Client client.Client
@@ -102,36 +104,25 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(comp compone
 		return nil, err
 	}
 
-	linkedSecrets := make(map[string]struct{})
-	for _, secret := range serviceAccount.Secrets {
-		linkedSecrets[secret.Name] = struct{}{}
-	}
-
-	var allSecrets corev1.SecretList
-	if err := r.Client.List(ctx, &allSecrets, client.InNamespace(componentNamespace)); err != nil {
-		log.Error(err, fmt.Sprintf("unable to list secrets in namespace %s", componentNamespace))
-		return nil, err
-	}
-
 	mergedAuths := make(map[string]interface{})
-	for _, secret := range allSecrets.Items {
-		if _, linked := linkedSecrets[secret.Name]; !linked {
-			continue // Skip Secrets that are not linked to the build-pipeline ServiceAccount
+	for _, secretRef := range serviceAccount.Secrets {
+		var secret corev1.Secret
+		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: secretRef.Name}, &secret); err != nil {
+			log.Error(err, fmt.Sprintf("unable to get secret %s in namespace %s", secretRef.Name, componentNamespace))
+			return nil, err
 		}
 
-		var secretDataKey string
-		switch secret.Type {
-		case corev1.SecretTypeDockerConfigJson:
-			secretDataKey = corev1.DockerConfigJsonKey
-		case corev1.SecretTypeDockercfg:
-			secretDataKey = corev1.DockerConfigKey
-		default:
-			continue // Skip Secrets with type other than Dockercfg and DockerConfigJson
+		if secret.Type != corev1.SecretTypeDockerConfigJson {
+			continue // Skip Secrets with type other than DockerConfigJson
 		}
 
-		data, exists := secret.Data[secretDataKey]
+		if value, exists := secret.Labels[InternalSecretLabelName]; exists && value == "true" {
+			continue // Skip Secrets labeled as internal
+		}
+
+		data, exists := secret.Data[corev1.DockerConfigJsonKey]
 		if !exists {
-			log.Info(fmt.Sprintf("skipping secret %s with missing %s section", secret.Name, secretDataKey))
+			log.Info(fmt.Sprintf("skipping secret %s with missing %s section", secret.Name, corev1.DockerConfigJsonKey))
 			continue
 		}
 		var dockerConfig map[string]interface{}
@@ -141,10 +132,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(comp compone
 
 		auths, exists := dockerConfig["auths"].(map[string]interface{})
 		if !exists {
-			if secret.Type != corev1.SecretTypeDockercfg {
-				continue
-			}
-			auths = dockerConfig
+			continue
 		}
 		for registry, creds := range auths {
 			mergedAuths[registry] = creds
@@ -331,17 +319,15 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 		builder.WithConfigMap(caConfigMap.ObjectMeta.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
-	if renovateSecret.Data != nil {
-		if _, exists := renovateSecret.Data[corev1.DockerConfigJsonKey]; exists {
-			secretItems := []corev1.KeyToPath{
-				{
-					Key:  corev1.DockerConfigJsonKey,
-					Path: "config.json",
-				},
-			}
-			secretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-			builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
+	if _, exists := renovateSecret.Data[corev1.DockerConfigJsonKey]; exists {
+		secretItems := []corev1.KeyToPath{
+			{
+				Key:  corev1.DockerConfigJsonKey,
+				Path: "config.json",
+			},
 		}
+		secretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
+		builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
 	pipelineRun, err := builder.Build()

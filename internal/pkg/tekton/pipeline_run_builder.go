@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -342,7 +343,9 @@ func (b *PipelineRunBuilder) WithSecret(name, mountPath string, items []corev1.K
 	// Find the specified task
 	for i, task := range b.pipelineRun.Spec.PipelineSpec.Tasks {
 		if task.Name == opts.TaskName && task.TaskSpec != nil {
-			volumeName := fmt.Sprintf("secret-%s", name)
+			// Generate unique volume name using random string to avoid conflicts
+			// when the same secret is mounted multiple times
+			volumeName := fmt.Sprintf("secret-%s-%s", name, utils.RandomString(8))
 			volume := corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{

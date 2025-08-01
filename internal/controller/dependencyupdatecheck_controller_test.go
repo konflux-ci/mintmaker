@@ -169,10 +169,38 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
 			})
 
-			It("should exclude secrets that do not contain a docker config", func() {
+			It("should exclude secrets that are not of the DockerConfigJson type", func() {
 				// Create image registry secret
 				secretData := map[string][]byte{corev1.BasicAuthUsernameKey: []byte("testusername"), corev1.BasicAuthPasswordKey: []byte("testpassword")}
 				createSecret(registrySecretKey, corev1.SecretTypeBasicAuth, secretData, nil)
+
+				// Link the registry secret to the service account
+				serviceAccount := getServiceAccount(serviceAccountKey)
+				serviceAccount.Secrets = []corev1.ObjectReference{{Name: registrySecretName}}
+				Expect(k8sClient.Update(ctx, serviceAccount)).Should(Succeed())
+
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1))
+				Consistently(func() map[string][]byte {
+					plrName := listPipelineRuns(MintMakerNamespaceName)[0].Name
+					renovateSecret := getSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: plrName})
+					return renovateSecret.Data
+				}).Should(BeNil())
+
+				deleteSecret(registrySecretKey)
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			It("should exclude secrets that are labeled as internal", func() {
+				// Create image registry secret
+				secretData := map[string][]byte{corev1.DockerConfigJsonKey: mergedConfigJson}
+				createSecret(registrySecretKey, corev1.SecretTypeDockerConfigJson, secretData, nil)
+
+				// Add the internal label to the registry secret
+				registrySecret := getSecret(registrySecretKey)
+				registrySecret.Labels = map[string]string{InternalSecretLabelName: "true"}
+				Expect(k8sClient.Update(ctx, registrySecret)).Should(Succeed())
 
 				// Link the registry secret to the service account
 				serviceAccount := getServiceAccount(serviceAccountKey)

@@ -83,14 +83,14 @@ type HostRule map[string]string
 func (c *BaseComponent) TransformHostRules(ctx context.Context, registrySecret *corev1.Secret) ([]HostRule, error) {
 	log := logger.FromContext(ctx)
 
-	if registrySecret == nil {
-		return nil, errors.New("Registry secret is nil")
+	if _, exists := registrySecret.Data[corev1.DockerConfigJsonKey]; !exists {
+		return nil, errors.New(fmt.Sprintf("Secret %s is missing the %s key", registrySecret.Name, corev1.DockerConfigJsonKey))
 	}
 
 	var hostRules []HostRule
 	var secrets map[string]map[string]HostRule
 
-	err := json.Unmarshal(registrySecret.Data[".dockerconfigjson"], &secrets)
+	err := json.Unmarshal(registrySecret.Data[corev1.DockerConfigJsonKey], &secrets)
 
 	if err != nil {
 		log.Info(fmt.Sprintf("Cannot unmarshal registry secret: %s", err))
