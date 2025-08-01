@@ -83,7 +83,51 @@ func createNamespace(name string) {
 	}, timeout, interval).Should(BeTrue())
 }
 
-func createSecret(resourceKey types.NamespacedName, data map[string]string) {
+func createServiceAccount(resourceKey types.NamespacedName) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resourceKey.Name,
+			Namespace: resourceKey.Namespace,
+		},
+	}
+	if err := k8sClient.Create(ctx, sa); err != nil {
+		if !k8sErrors.IsAlreadyExists(err) {
+			Fail(err.Error())
+		}
+		deleteServiceAccount(resourceKey)
+		Expect(k8sClient.Create(ctx, sa)).Should(Succeed())
+	}
+	getServiceAccount(resourceKey)
+}
+
+func deleteServiceAccount(resourceKey types.NamespacedName) {
+	sa := &corev1.ServiceAccount{}
+	if err := k8sClient.Get(ctx, resourceKey, sa); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			return
+		}
+		Fail(err.Error())
+	}
+	if err := k8sClient.Delete(ctx, sa); err != nil {
+		if !k8sErrors.IsNotFound(err) {
+			Fail(err.Error())
+		}
+		return
+	}
+	Eventually(func() bool {
+		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, sa))
+	}, timeout, interval).Should(BeTrue())
+}
+
+func getServiceAccount(resourceKey types.NamespacedName) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{}
+	Eventually(func() error {
+		return k8sClient.Get(ctx, resourceKey, sa)
+	}, timeout, interval).Should(Succeed())
+	return sa
+}
+
+func createSecret(resourceKey types.NamespacedName, secretType corev1.SecretType, data map[string][]byte, stringData map[string]string) {
 	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -93,7 +137,9 @@ func createSecret(resourceKey types.NamespacedName, data map[string]string) {
 			Name:      resourceKey.Name,
 			Namespace: resourceKey.Namespace,
 		},
-		StringData: data,
+		Type:       secretType,
+		Data:       data,
+		StringData: stringData,
 	}
 	if err := k8sClient.Create(ctx, secret); err != nil {
 		if !k8sErrors.IsAlreadyExists(err) {
