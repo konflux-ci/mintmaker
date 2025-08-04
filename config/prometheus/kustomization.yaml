@@ -1,2 +1,4 @@
 resources:
 - monitor.yaml
+- mintmaker-duc-monitoring-rules.yaml
+- mintmaker-duc-alerts.yaml

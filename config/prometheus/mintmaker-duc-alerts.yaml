@@ -1,0 +1,70 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mintmaker-dependency-update-check-alerting-rules
+  labels:
+    tenant: rhtap
+    severity: critical
+    slo: "true"
+spec:
+  groups:
+  - name: mintmaker-dependency-update-check-slo
+    interval: 5m
+    rules:
+
+    # Alert when DependencyUpdateCheck creation metrics are not available
+    - alert: MintMakerDependencyUpdateCheckMetricsUnavailable
+      expr: |
+        absent_over_time(mintmaker_dependency_update_check_creation_time[30m])
+      for: 30m
+      labels:
+        severity: warning
+        slo: "true"
+        component: mintmaker
+      annotations:
+        summary: >-
+          MintMaker DependencyUpdateCheck creation metrics are unavailable
+        description: >-
+          DependencyUpdateCheck creation metrics have been unavailable for more than 30 minutes on cluster {{ $labels.source_cluster }}.
+          This may indicate an issue with the metrics collection or the MintMaker controller.
+        alert_team_handle: <!subteam^S078T8TMQP5>
+        team: mintmaker
+        runbook_url: https://gitlab.cee.redhat.com/konflux/docs/sop/-/blob/main/mintmaker/faq.md
+
+    # Optional: Warning alert at 4 hours (before the critical threshold)
+    - alert: MintMakerDependencyUpdateCheckOverdue
+      expr: |
+        mintmaker_dependency_update_check_time_since_last_creation_hours > 4
+      for: 15m  # Wait 15 minutes to reduce noise
+      labels:
+        severity: warning
+        slo: "true" 
+        component: mintmaker
+      annotations:
+        summary: >-
+          MintMaker DependencyUpdateCheck resource creation is approaching the SLA limit
+        description: >-
+          No DependencyUpdateCheck resource has been created for {{ $value | humanizeDuration }} on cluster {{ $labels.source_cluster }}.
+          This is approaching the 4h30m SLA limit. Please check the periodic creation mechanism.
+        alert_team_handle: <!subteam^S078T8TMQP5> 
+        team: mintmaker
+        runbook_url: https://gitlab.cee.redhat.com/konflux/docs/sop/-/blob/main/mintmaker/faq.md
+
+    # Alert when no DependencyUpdateCheck has been created within 4h30m window
+    - alert: MintMakerDependencyUpdateCheckMissing
+      expr: |
+        mintmaker_dependency_update_check_creation_overdue == 1
+      for: 0m  # Alert immediately when the condition is true
+      labels:
+        severity: critical
+        slo: "true"
+        component: mintmaker
+      annotations:
+        summary: >-
+          MintMaker DependencyUpdateCheck resource not created within expected 4h30m window
+        description: >-
+          No DependencyUpdateCheck resource has been created for {{ $value | humanizeDuration }} on cluster {{ $labels.source_cluster }}. 
+          DependencyUpdateCheck resources should be created every 4 hours. This may indicate an issue with the periodic creation mechanism.
+        alert_team_handle: <!subteam^S078T8TMQP5>
+        team: mintmaker
+        runbook_url: https://gitlab.cee.redhat.com/konflux/docs/sop/-/blob/main/mintmaker/faq.md

@@ -5,130 +5,39 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - appstudio.redhat.com
-  resources:
-  - dependencyupdatechecks
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - appstudio.redhat.com
-  resources:
-  - dependencyupdatechecks/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - appstudio.redhat.com
-  resources:
-  - dependencyupdatechecks/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - appstudio.redhat.com
-  resources:
-  - components
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
+  - delete
   - get
   - list
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - events/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - tekton.dev
   resources:
   - pipelineruns
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - tekton.dev
-  resources:
-  - pipelineruns/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - tekton.dev
-  resources:
   - pipelineruns/status
   verbs:
   - get
+  - list
   - patch
   - update
-- apiGroups:
-  - security.openshift.io
-  resourceNames:
-  - anyuid
-  resources:
-  - securitycontextconstraints
-  verbs:
-  - use
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: manager-role
-  namespace: system
-rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
   - watch

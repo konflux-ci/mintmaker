@@ -1,0 +1,24 @@
+# Local development configuration for Minikube/Kind
+# This excludes Prometheus Operator resources that aren't available in vanilla Kubernetes
+
+# Adds namespace to all resources.
+namespace: mintmaker-system
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+namePrefix: mintmaker-
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+# [METRICS] Expose the controller manager metrics service.
+- ../default/metrics_service.yaml
+
+# Patches to configure the controller
+patches:
+# [METRICS] Enable metrics endpoint using HTTP on port 8080
+- path: ../default/manager_metrics_patch.yaml
+  target:
+    kind: Deployment

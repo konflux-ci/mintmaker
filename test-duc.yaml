@@ -1,0 +1,18 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: DependencyUpdateCheck
+metadata:
+  name: test-duc
+  namespace: mintmaker-system
+  labels:
+    app.kubernetes.io/name: mintmaker
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  namespaces:
+  - namespace: "namespace1"
+    applications:
+    - application: "application1"
+      components:
+      - "component1"
+      - "component2"
+    - application: "application2"
+  - namespace: "namespace2"

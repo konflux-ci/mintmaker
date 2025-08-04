@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mintmaker-dependency-update-check-monitoring-rules
+  labels:
+    tenant: rhtap
+spec:
+  groups:
+  - name: mintmaker_dependency_update_check_monitoring
+    interval: 1m
+    rules:
+      # Record the latest DependencyUpdateCheck creation time across all instances
+      - record: mintmaker_dependency_update_check_latest_creation_time
+        expr: max(mintmaker_dependency_update_check_creation_time) by (job, instance)
+      
+      # Record the time since the last DependencyUpdateCheck was created (in seconds)
+      - record: mintmaker_dependency_update_check_time_since_last_creation_seconds
+        expr: time() - mintmaker_dependency_update_check_latest_creation_time
+      
+      # Record the time since the last DependencyUpdateCheck was created (in hours)
+      - record: mintmaker_dependency_update_check_time_since_last_creation_hours
+        expr: mintmaker_dependency_update_check_time_since_last_creation_seconds / 3600
+      
+      # Record if DependencyUpdateCheck creation is overdue (more than 4.5 hours)
+      - record: mintmaker_dependency_update_check_creation_overdue
+        expr: mintmaker_dependency_update_check_time_since_last_creation_hours > 4.5
