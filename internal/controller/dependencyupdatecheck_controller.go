@@ -108,6 +108,10 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(comp compone
 	for _, secretRef := range serviceAccount.Secrets {
 		var secret corev1.Secret
 		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: secretRef.Name}, &secret); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info(fmt.Sprintf("secret %s not found in namespace %s", secretRef.Name, componentNamespace))
+				continue
+			}
 			log.Error(err, fmt.Sprintf("unable to get secret %s in namespace %s", secretRef.Name, componentNamespace))
 			return nil, err
 		}
