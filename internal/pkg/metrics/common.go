@@ -20,6 +20,14 @@ var (
 		},
 		[]string{"status"}, // "success" or "failure"
 	)
+	dependencyUpdateCheckCreationTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: "mintmaker",
+			Name:      "dependency_update_check_creation_time",
+			Help:      "Unix timestamp when the last DependencyUpdateCheck resource was created",
+		},
+		[]string{"namespace", "name"},
+	)
 )
 
 func RegisterCommonMetrics(ctx context.Context, registerer prometheus.Registerer) error {
@@ -27,6 +35,10 @@ func RegisterCommonMetrics(ctx context.Context, registerer prometheus.Registerer
 	if err := registerer.Register(controllerAvailabilityVec); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
 	}
+	if err := registerer.Register(dependencyUpdateCheckCreationTime); err != nil {
+		return fmt.Errorf("failed to register metrics: %w", err)
+	}
+
 	ticker := time.NewTicker(10 * time.Minute)
 	log.Info("Starting metrics")
 	go func() {
@@ -73,6 +85,12 @@ func CountScheduledRunFailure() {
 		probeFailure = &watcher
 	}
 	(*probeFailure).AddEvent()
+}
+
+// RecordDependencyUpdateCheckCreation records the creation of a DependencyUpdateCheck resource
+func RecordDependencyUpdateCheckCreation(namespace, name string) {
+	now := float64(time.Now().Unix())
+	dependencyUpdateCheckCreationTime.WithLabelValues(namespace, name).Set(now)
 }
 
 type AvailabilityProbe interface {

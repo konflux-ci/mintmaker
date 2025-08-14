@@ -43,6 +43,7 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/pkg/component"
 	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 	"github.com/konflux-ci/mintmaker/internal/pkg/tekton"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
@@ -378,6 +379,10 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 	return pipelineRun, nil
 }
 
+// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/finalizers,verbs=update
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -404,6 +409,11 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 	// Update the DependencyUpdateCheck to add a processed annotation
 	log.Info(fmt.Sprintf("new DependencyUpdateCheck found: %v", req.NamespacedName))
+
+	// Record metrics for DependencyUpdateCheck creation
+	mintmakermetrics.RecordDependencyUpdateCheckCreation(dependencyupdatecheck.Namespace, dependencyupdatecheck.Name)
+	log.Info("Recorded DependencyUpdateCheck creation metrics", "namespace", dependencyupdatecheck.Namespace, "name", dependencyupdatecheck.Name)
+
 	if dependencyupdatecheck.Annotations == nil {
 		dependencyupdatecheck.Annotations = map[string]string{}
 	}
