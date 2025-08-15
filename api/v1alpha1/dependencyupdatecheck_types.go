@@ -18,13 +18,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Component represents a Component name within a Konflux Application.
 // +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 // +kubebuilder:validation:MaxLength=63
 type Component string
 
+// ApplicationSpec scopes MintMaker to specific Components within a single Konflux Application.
 type ApplicationSpec struct {
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-	// Specifies the name of the application for which to run Mintmaker.
+	// Specifies the name of the Konflux application for which to run Mintmaker.
+	// For more details see <a href="https://github.com/konflux-ci/architecture/blob/main/architecture/core/hybrid-application-service.md">Konflux Application Service</a>.
 	// Required.
 	// +required
 	Application string `json:"application"`
@@ -35,14 +38,15 @@ type ApplicationSpec struct {
 	Components []Component `json:"components,omitempty"`
 }
 
+// NamespaceSpec scopes MintMaker to specific Applications within a Kubernetes namespace.
 type NamespaceSpec struct {
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-	//Specifies the name of the namespace for which to run Mintmaker.
+	// Specifies the name of the Kubernetes namespace for which to run Mintmaker.
 	// Required.
 	// +required
 	Namespace string `json:"namespace"`
 
-	// Specifies the list of applications in a namespace for which to run MintMaker.
+	// Specifies the list of Konflux applications in a namespace for which to run MintMaker.
 	// If omitted, MintMaker will run for all namespace's applications.
 	// +optional
 	Applications []ApplicationSpec `json:"applications,omitempty"`
@@ -51,7 +55,9 @@ type NamespaceSpec struct {
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// DependencyUpdateCheckSpec defines the desired state of DependencyUpdateCheck
+// DependencyUpdateCheckSpec filters which Konflux Components will be scanned.
+// If `namespaces` is empty, MintMaker scans all Components discoverable to the controller.
+// If provided, MintMaker only scans Components that match the namespace/application/component filters.
 type DependencyUpdateCheckSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -71,7 +77,18 @@ type DependencyUpdateCheckStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// DependencyUpdateCheck is the Schema for the dependencyupdatechecks API
+// DependencyUpdateCheck is the root CRD that triggers mintmaker to Konflux Components for dependency updates.
+// How the controller uses this CRD:
+// - Only CRs created in the MintMaker namespace (see `MintMakerNamespaceName`) are processed.
+// - When a CR is created, the controller discovers Konflux Components to scan:
+//   - By default: all `appstudio.redhat.com/v1alpha1, Kind=Component` across the cluster
+//   - Or: a filtered subset when `spec.namespaces` is provided
+//   - For each unique repository+branch across those Components, the controller generates
+//     one Tekton `PipelineRun` that scans the repository for dependency updates using Renovate.
+//
+// Annotations:
+//   - `mintmaker.appstudio.redhat.com/processed`: set by the controller when the
+//     DependencyUpdateCheck is processed, to avoid reprocessing the same CR.
 type DependencyUpdateCheck struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
