@@ -344,6 +344,8 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 	}
 	if err := r.Client.Create(ctx, pipelineRun); err != nil {
 		return nil, err
+	} else {
+		log.Info(fmt.Sprintf("created PipelineRun %s", pipelineRun.Name))
 	}
 	resources = append(resources, pipelineRun)
 
