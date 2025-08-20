@@ -402,7 +402,7 @@
   "forkProcessing": "enabled",
   "allowedCommands": [
     "^rpm-lockfile-prototype rpms.in.yaml$",
-    "pipeline-migration-tool migrate -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\""
+    "^pipeline-migration-tool migrate -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false,
