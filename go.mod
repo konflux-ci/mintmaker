@@ -2,7 +2,7 @@ module github.com/konflux-ci/mintmaker
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.25.0
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.14.0
