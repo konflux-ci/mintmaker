@@ -1,0 +1,12 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: DependencyUpdateCheck
+metadata:
+  name: dependencyupdatecheck-asdf
+  namespace: mintmaker
+  labels:
+    app.kubernetes.io/created-by: mintmaker
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: dependencyupdatecheck
+    app.kubernetes.io/part-of: mintmaker
+spec: {}
+# test ignore
