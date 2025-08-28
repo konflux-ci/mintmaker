@@ -101,6 +101,396 @@
         "prBodyTemplate": "{{{header}}}{{{table}}}{{{notes}}}{{{changelogs}}}{{{configDescription}}}{{{controls}}}{{{footer}}}",
         "recreateWhen": "always",
         "rebaseWhen": "behind-base-branch"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-acs-deploy-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-acs-deploy-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-acs-image-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-acs-image-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-acs-image-scan"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-acs-image-scan"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-apply-tags"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-apply-tags"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-10gb"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-10gb"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-20gb"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-20gb"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-24gb"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-24gb"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-6gb"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-6gb"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-8gb"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-8gb"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-min"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-min"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-remote"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-remote"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-remote-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-buildah-rhtap"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-buildah-rhtap"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-build-image-index"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-build-image-index"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-build-image-manifest"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-build-image-manifest"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-build-vm-image"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-build-vm-image"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-clair-scan"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-clair-scan"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-clamav-scan"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-clamav-scan"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-deprecated-image-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-deprecated-image-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-download-sbom-from-url-in-attestation"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-download-sbom-from-url-in-attestation"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-eaas-provision-space"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-eaas-provision-space"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-ecosystem-cert-preflight-checks"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-fbc-related-image-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-fbc-related-image-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-fbc-validation"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-fbc-validation"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-gather-deploy-images"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-gather-deploy-images"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-generate-labels"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-generate-labels"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-generate-odcs-compose"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-generate-odcs-compose"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-git-clone"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-git-clone"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-git-clone-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-init"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-init"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-inspect-image"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-inspect-image"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-oci-copy"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-oci-copy"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-oci-copy-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-oci-copy-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-operator-sdk-generate-bundle"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-operator-sdk-generate-bundle"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-opm-get-bundle-version"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-opm-get-bundle-version"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-opm-render-bundles"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-opm-render-bundles"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-prefetch-dependencies"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-prefetch-dependencies-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-provision-env-with-ephemeral-namespace"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-provision-env-with-ephemeral-namespace"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-push-dockerfile"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-push-dockerfile"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-push-dockerfile-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-push-dockerfile-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-reduce-snapshot-to-single-component"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-reduce-snapshot-to-single-component"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-rpm-ostree"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-rpm-ostree"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-rpms-signature-scan"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-s2i-java"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-s2i-java"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-s2i-nodejs"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-s2i-nodejs"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-sast-shell-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-sast-shell-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-sast-snyk-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-sast-snyk-check-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-sast-unicode-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-sast-unicode-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-sbom-json-check"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-sbom-json-check"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-show-sbom"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-show-sbom"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-show-sbom-rhdh"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-show-sbom-rhdh"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-slack-webhook-notification"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-slack-webhook-notification"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-source-build"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-source-build"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-source-build-oci-ta"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-summary"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-summary"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-tkn-bundle"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-tkn-bundle"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-update-deployment"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-update-deployment"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-update-infra-deployments"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-update-infra-deployments"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-upload-sbom-to-trustification"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-upload-sbom-to-trustification"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-verify-enterprise-contract"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-verify-enterprise-contract"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/redhat-appstudio-tekton-catalog/task-verify-signed-rpms"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-verify-signed-rpms"
       }
     ],
     "schedule": [
