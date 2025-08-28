@@ -104,6 +104,21 @@
       },
       {
         "matchPackageNames": [
+          "/^quay.io/redhat-appstudio-tekton-catalog//"
+        ],
+        "matchUpdateTypes": [
+          "replacement"
+        ],
+        "branchPrefix": "konflux/references-replacement/",
+        "groupName": "Konflux references replacement",
+        "group": {
+          "commitMessageTopic": "redhat-appstudio-tekton-catalog references",
+          "commitMessageExtra": "",
+          "commitBody": "redhat-appstudio-tekton-catalog is deprecated, replace the references\nwith equivalent konflux-ci/tekton-catalog references"
+        }
+      },
+      {
+        "matchPackageNames": [
           "quay.io/redhat-appstudio-tekton-catalog/task-acs-deploy-check"
         ],
         "replacementName": "quay.io/konflux-ci/tekton-catalog/task-acs-deploy-check"
