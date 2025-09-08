@@ -15,8 +15,8 @@ var (
 	controllerAvailabilityVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Subsystem: "mintmaker",
-			Name:      "availability",
-			Help:      "Number of successfully scheduled MintMaker PipelineRuns and failures",
+			Name:      "pipelinerun_scheduled",
+			Help:      "Number of scheduled MintMaker PipelineRuns (successes and failures)",
 		},
 		[]string{"status"}, // "success" or "failure"
 	)

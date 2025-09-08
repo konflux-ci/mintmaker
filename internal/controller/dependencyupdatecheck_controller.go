@@ -382,6 +382,11 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/finalizers,verbs=update
+// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=components,verbs=get;list;watch
+// +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -488,8 +493,10 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx)
 		if err != nil {
 			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
+			mintmakermetrics.CountScheduledRunFailure()
 		} else {
 			log.Info(fmt.Sprintf("created PipelineRun %s", pipelinerun.Name))
+			mintmakermetrics.CountScheduledRunSuccess()
 		}
 	}
 
