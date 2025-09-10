@@ -472,9 +472,16 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		// of repository+branch. We cannot use repository only,
 		// because the branch is used in Renovate's baseBranch config option.
 		branch, _ := comp.GetBranch()
-		key := fmt.Sprintf("%s/%s@%s", comp.GetHost(), comp.GetRepository(), branch)
+		host := comp.GetHost()
+		repository := comp.GetRepository()
+		key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
 
-		log.Info(fmt.Sprintf("check if PipelineRun has been created for %s", key))
+		log.Info("check if PipelineRun has been created",
+			"key", key,
+			"component", appstudioComponent.Name,
+			"branch", branch,
+			"repository", repository,
+			"host", host)
 
 		if slices.Contains(processedComponents, key) {
 			// PipelineRun has already been created for this repo-branch
@@ -483,13 +490,21 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			processedComponents = append(processedComponents, key)
 		}
 
-		log.Info(fmt.Sprintf("creating PipelineRun for %s", key))
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
 		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx)
 		if err != nil {
-			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
+			log.Error(err, "failed to create PipelineRun",
+				"component", appstudioComponent.Name,
+				"branch", branch,
+				"repository", repository,
+				"host", host)
 		} else {
-			log.Info(fmt.Sprintf("created PipelineRun %s", pipelinerun.Name))
+			log.Info("created PipelineRun",
+				"component", appstudioComponent.Name,
+				"branch", branch,
+				"repository", repository,
+				"host", host,
+				"PipelineRun", pipelinerun.Name)
 		}
 	}
 
