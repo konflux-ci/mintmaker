@@ -483,13 +483,15 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			processedComponents = append(processedComponents, key)
 		}
 
-		log.Info(fmt.Sprintf("creating PipelineRun for %s", key))
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
 		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx)
 		if err != nil {
-			log.Info(fmt.Sprintf("failed to create PipelineRun for %s: %s", appstudioComponent.Name, err.Error()))
+			log.Error(err, fmt.Sprintf("failed to create PipelineRun for %s", appstudioComponent.Name))
 		} else {
-			log.Info(fmt.Sprintf("created PipelineRun %s", pipelinerun.Name))
+			log.Info("created PipelineRun",
+				"component", appstudioComponent.Name,
+				"repository", key,
+				"PipelineRun", pipelinerun.Name)
 		}
 	}
 
