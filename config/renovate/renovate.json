@@ -65,7 +65,8 @@
     "gomod",
     "ocb",
     "gitlabci",
-    "gitlabci-include"
+    "gitlabci-include",
+    "cargo"
   ],
   "tekton": {
     "managerFilePatterns": [
