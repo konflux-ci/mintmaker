@@ -15,6 +15,7 @@
   "autodiscover": false,
   "pruneStaleBranches": false,
   "branchConcurrentLimit": 0,
+  "configMigration": true,
   "containerVulnerabilityAlerts": true,
   "rpmVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
