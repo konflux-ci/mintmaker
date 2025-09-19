@@ -566,6 +566,12 @@
     "rebaseWhen": "behind-base-branch",
     "branchTopic": "lock-file-maintenance"
   },
+  "git-submodules": {
+    "enabled": true
+  },
+  "pre-commit": {
+    "enabled": true
+  },
   "gomod": {
     "postUpdateOptions": [
       "gomodUpdateImportPaths",
