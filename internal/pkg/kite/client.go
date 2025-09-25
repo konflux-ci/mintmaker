@@ -12,29 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clients
+package kite
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 )
 
-type KiteClient struct {
+type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewKiteClient creates a new Kite API client
-func NewKiteClient(baseURL string) (*KiteClient, error) {
+// NewClient creates a new Kite API client
+func NewClient(baseURL string) (*Client, error) {
 	if baseURL == "" {
-		return nil, errors.New("KITE API base URL cannot be empty")
+		return nil, fmt.Errorf("KITE API base URL cannot be empty")
 	}
 
-	return &KiteClient{
+	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -44,7 +43,7 @@ func NewKiteClient(baseURL string) (*KiteClient, error) {
 
 // sendRequest sends the given request to KITE API and stores
 // the decoded response body in the value pointed to by out
-func (c *KiteClient) sendRequest(req *http.Request, out any) error {
+func (c *Client) sendRequest(req *http.Request, out any) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -65,18 +64,28 @@ func (c *KiteClient) sendRequest(req *http.Request, out any) error {
 	return nil
 }
 
-// GetVersion returns the KITE API version information
-func (c *KiteClient) GetVersion(ctx context.Context) (map[string]any, error) {
+// GetVersion returns the KITE API version
+func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	url := fmt.Sprintf("%s/api/v1/version", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var respBody map[string]any
 	if err := c.sendRequest(req, &respBody); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return respBody, nil
+	key := "version"
+	val, ok := respBody[key]
+	if !ok {
+		return "", fmt.Errorf("key '%s' not found in response body", key)
+	}
+	verStr, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("key '%s' has unexpected type: expected string, got %T", key, val)
+	}
+
+	return verStr, nil
 }

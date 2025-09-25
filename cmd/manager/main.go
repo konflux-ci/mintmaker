@@ -42,8 +42,8 @@ import (
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/controller"
-	"github.com/konflux-ci/mintmaker/internal/pkg/clients"
 	"github.com/konflux-ci/mintmaker/internal/pkg/config"
+	"github.com/konflux-ci/mintmaker/internal/pkg/kite"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
@@ -179,16 +179,16 @@ func main() {
 	}
 
 	// Create KITE client
-	kiteClient, err := clients.NewKiteClient(kiteAPIURL)
+	kiteClient, err := kite.NewClient(kiteAPIURL)
 	if err != nil {
 		setupLog.Error(err, "failed to create KITE API client")
 	} else {
 		// Log KITE API version
-		body, err := kiteClient.GetVersion(ctx)
+		ver, err := kiteClient.GetVersion(ctx)
 		if err != nil {
 			setupLog.Error(err, "failed to get KITE API version")
 		} else {
-			setupLog.Info(fmt.Sprintf("KITE API version: %s", body["version"]))
+			setupLog.Info(fmt.Sprintf("KITE API version: %s", ver))
 		}
 	}
 
