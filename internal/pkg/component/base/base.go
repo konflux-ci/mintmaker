@@ -176,6 +176,22 @@ func getActivationKeyFromSecret(secret *corev1.Secret) (string, string, error) {
 	return activationKey, org, nil
 }
 
+func getRPMSSLAuthFromSecret(secret *corev1.Secret) (string, string, error) {
+
+	if secret == nil {
+		return "", "", fmt.Errorf("no viable rpm ssl auth secret has been found")
+	}
+
+	sslCert := string(secret.Data["sslcert"])
+	sslKey := string(secret.Data["sslkey"])
+
+	if sslCert == "" || sslKey == "" {
+		return "", "", fmt.Errorf("secret %s doesn't contain sslcert or sslkey", secret.Name)
+	}
+
+	return sslCert, sslKey, nil
+}
+
 // returns two strings, activationkey and org
 func (c *BaseComponent) GetRPMActivationKey(k8sClient client.Client, ctx context.Context) (string, string, error) {
 
@@ -261,5 +277,93 @@ func (c *BaseComponent) GetRPMActivationKey(k8sClient client.Client, ctx context
 		}
 	}
 	return getActivationKeyFromSecret(&secrets[bestIndex])
+
+}
+
+// returns two strings, sslcert and sslkey
+func (c *BaseComponent) GetRPMSSLAuth(k8sClient client.Client, ctx context.Context) (string, string, error) {
+
+	defaultSecret := &corev1.Secret{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: "rpm-ssl-auth"}, defaultSecret); err != nil {
+		defaultSecret = &corev1.Secret{}
+	}
+
+	secretList := &corev1.SecretList{}
+	opts := client.ListOption(&client.MatchingLabels{
+		"appstudio.redhat.com/credentials": "rpm-ssl-auth",
+		"appstudio.redhat.com/scm.host":    c.Host,
+	})
+
+	// find secrets that have the following labels:
+	//	- "appstudio.redhat.com/credentials": "rpm-ssl-auth"
+	//	- "appstudio.redhat.com/scm.host": <name of component host>
+	if err := k8sClient.List(ctx, secretList, client.InNamespace(c.Namespace), opts); err != nil {
+		return getRPMSSLAuthFromSecret(defaultSecret)
+	}
+
+	// filtering to get Opaque secrets and data is not empty
+	secrets := bslices.Filter(secretList.Items, func(secret corev1.Secret) bool {
+		return secret.Type == corev1.SecretTypeOpaque && len(secret.Data) > 0
+	})
+	if len(secrets) == 0 {
+		return getRPMSSLAuthFromSecret(defaultSecret)
+	}
+
+	// secrets only match with component's host
+	var hostOnlySecrets []corev1.Secret
+	// map of secret index and its best path intersections count, i.e. the count of path parts matched,
+	var potentialMatches = make(map[int]int, len(secrets))
+
+	for index, secret := range secrets {
+		repositoryLabel, exists := secret.Annotations["appstudio.redhat.com/scm.repository"]
+		if !exists || repositoryLabel == "" {
+			hostOnlySecrets = append(hostOnlySecrets, secret)
+			continue
+		}
+
+		secretRepositories := strings.Split(repositoryLabel, ",")
+		// trim possible prefix or suffix "/"
+		for i, repository := range secretRepositories {
+			secretRepositories[i] = strings.TrimPrefix(strings.TrimSuffix(repository, "/"), "/")
+		}
+
+		// this secret matches exactly the component's repository name
+		if slices.Contains(secretRepositories, c.Repository) {
+			return getRPMSSLAuthFromSecret(&secret)
+		}
+
+		// no direct match, check for wildcard match, i.e. org/repo/* matches org/repo/foo, org/repo/bar, etc.
+		componentRepoParts := strings.Split(c.Repository, "/")
+
+		// find wildcard repositories
+		wildcardRepos := slices.Filter(nil, secretRepositories, func(s string) bool { return strings.HasSuffix(s, "*") })
+
+		for _, repo := range wildcardRepos {
+			i := bslices.Intersection(componentRepoParts, strings.Split(strings.TrimSuffix(repo, "*"), "/"))
+			if i > 0 && potentialMatches[index] < i {
+				// add whole secret index to potential matches
+				potentialMatches[index] = i
+			}
+		}
+	}
+
+	if len(potentialMatches) == 0 {
+		if len(hostOnlySecrets) == 0 {
+			// no potential matches, no host matches, try default secret if it exists
+			return getRPMSSLAuthFromSecret(defaultSecret)
+		}
+		// no potential matches, but we have host match secrets, return the first one
+		return getRPMSSLAuthFromSecret(&hostOnlySecrets[0])
+	}
+
+	// some potential matches exist, find the best one
+	var bestIndex, bestCount int
+	for i, count := range potentialMatches {
+		if count > bestCount {
+			bestCount = count
+			bestIndex = i
+		}
+	}
+	return getRPMSSLAuthFromSecret(&secrets[bestIndex])
 
 }
