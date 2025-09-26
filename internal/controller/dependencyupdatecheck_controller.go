@@ -262,6 +262,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Creating the pipelineRun definition
+	branch, _ := comp.GetBranch()
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
@@ -270,6 +271,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
+			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(branch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
