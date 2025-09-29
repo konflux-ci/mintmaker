@@ -510,9 +510,6 @@
         "replacementName": "quay.io/konflux-ci/tekton-catalog/task-verify-signed-rpms"
       }
     ],
-    "schedule": [
-      "* 5-23 * * 6"
-    ],
     "postUpgradeTasks": {
       "commands": [
         "pipeline-migration-tool migrate -f \"$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\""
