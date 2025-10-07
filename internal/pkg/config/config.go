@@ -17,6 +17,7 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ type GlobalConfig struct {
 	GhTokenValidity       time.Duration
 	GhTokenUsageWindow    time.Duration
 	GhTokenRenewThreshold time.Duration
+	KiteAPIURL            string
 }
 
 type ControllerConfig struct {
@@ -52,6 +54,7 @@ func DefaultConfig() *ControllerConfig {
 			GhTokenValidity:       GhTokenValidity,
 			GhTokenUsageWindow:    GhTokenUsageWindow,
 			GhTokenRenewThreshold: GhTokenValidity - GhTokenUsageWindow,
+			KiteAPIURL:            os.Getenv("KITE_API_URL"),
 		},
 	}
 }
@@ -62,6 +65,7 @@ func LoadConfig(ctx context.Context, client client.Reader) *ControllerConfig {
 		Global struct {
 			GhTokenValidity    string `json:"github-token-validity"`
 			GhTokenUsageWindow string `json:"github-token-usage-window"`
+			KiteAPIURL         string `json:"kite-api-url"`
 		} `json:"global"`
 	}
 
@@ -103,6 +107,13 @@ func LoadConfig(ctx context.Context, client client.Reader) *ControllerConfig {
 	}
 
 	config.GlobalConfig.GhTokenRenewThreshold = config.GlobalConfig.GhTokenValidity - config.GlobalConfig.GhTokenUsageWindow
+
+	if configReader.Global.KiteAPIURL != "" {
+		config.GlobalConfig.KiteAPIURL = configReader.Global.KiteAPIURL
+	} else {
+		// Fallback to environment variable
+		config.GlobalConfig.KiteAPIURL = os.Getenv("KITE_API_URL")
+	}
 
 	return config
 }
