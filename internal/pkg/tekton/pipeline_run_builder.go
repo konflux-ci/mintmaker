@@ -161,6 +161,19 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 											},
 										},
 										{
+											Name:  "prepare-rpm-ssl-auth-cert",
+											Image: "registry.access.redhat.com/ubi9",
+											Script: "[ ! -f \"/etc/renovate/ssl-auth-secret/rpm-ssl-auth-cert\" ] && echo 'RPM SSL Authsecret not found. Exiting.' && exit 0;" +
+												"mkdir -pv /workspace/shared-data/rpm-ssl-auth-certs;" +
+												"cp -v /etc/renovate/ssl-auth-secret/rpm-ssl-auth-cert /workspace/shared-data/rpm-ssl-auth-certs/cert.pem;" +
+												"cp -v /etc/renovate/ssl-auth-secret/rpm-ssl-auth-key /workspace/shared-data/rpm-ssl-auth-certs/key.pem;",
+											SecurityContext: &corev1.SecurityContext{
+												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+												AllowPrivilegeEscalation: ptr.To(false),
+												RunAsUser:                &rootUser,
+											},
+										},
+										{
 											Name:   "renovate",
 											Image:  renovateImageURL,
 											Script: `RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) RENOVATE_CONFIG_FILE=/etc/renovate/config/config.js renovate`,
@@ -208,6 +221,14 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												{
 													Name:  "DNF_VAR_SSL_CLIENT_CERT",
 													Value: "/workspace/shared-data/rpm-certs/cert.pem",
+												},
+												{
+													Name:  "DNF_VAR_SSL_AUTH_CLIENT_KEY",
+													Value: "/workspace/shared-data/rpm-ssl-auth-certs/key.pem",
+												},
+												{
+													Name:  "DNF_VAR_SSL_AUTH_CLIENT_CERT",
+													Value: "/workspace/shared-data/rpm-ssl-auth-certs/cert.pem",
 												},
 											},
 										},
