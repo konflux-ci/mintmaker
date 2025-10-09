@@ -15,9 +15,11 @@
 package kite
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -25,6 +27,19 @@ import (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+}
+
+type PipelineFailurePayload struct {
+	PipelineName  string `json:"pipelineName"`
+	Namespace     string `json:"namespace"`
+	FailureReason string `json:"failureReason"`
+	RunID         string `json:"runId,omitempty"`
+	LogsURL       string `json:"logsUrl,omitempty"`
+}
+
+type PipelineSuccessPayload struct {
+	PipelineName string `json:"pipelineName"`
+	Namespace    string `json:"namespace"`
 }
 
 // NewClient creates a new Kite API client
@@ -52,7 +67,13 @@ func (c *Client) sendRequest(req *http.Request, out any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("KITE API returned status code %d", resp.StatusCode)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+
+		responseBody := ""
+		if readErr == nil {
+			responseBody = string(bodyBytes)
+		}
+		return fmt.Errorf("KITE API returned status code %d: %s", resp.StatusCode, responseBody)
 	}
 
 	if out != nil {
@@ -88,4 +109,30 @@ func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	}
 
 	return verStr, nil
+}
+
+// SendPipelineFailure sends a pipeline failure event to KITE webhook
+func (c *Client) SendPipelineFailure(ctx context.Context, payload PipelineFailurePayload) error {
+	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-failure?namespace=%s", c.baseURL, payload.Namespace)
+
+	jsonPayload, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	return c.sendRequest(req, nil)
+}
+
+// SendPipelineSuccess sends a pipeline success event to KITE webhook
+func (c *Client) SendPipelineSuccess(ctx context.Context, payload PipelineSuccessPayload) error {
+	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-success?namespace=%s", c.baseURL, payload.Namespace)
+
+	jsonPayload, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	return c.sendRequest(req, nil)
 }
