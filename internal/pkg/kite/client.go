@@ -116,7 +116,6 @@ func (c *Client) SendPipelineFailure(ctx context.Context, payload PipelineFailur
 	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-failure?namespace=%s", c.baseURL, payload.Namespace)
 
 	jsonPayload, _ := json.Marshal(payload)
-	fmt.Printf("Sending failure request to %s containing \n %s", url, string(jsonPayload))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -130,7 +129,6 @@ func (c *Client) SendPipelineSuccess(ctx context.Context, payload PipelineSucces
 	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-success?namespace=%s", c.baseURL, payload.Namespace)
 
 	jsonPayload, _ := json.Marshal(payload)
-	fmt.Printf("Sending success request to %s containing \n %s", url, string(jsonPayload))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
