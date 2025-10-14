@@ -203,9 +203,10 @@ func main() {
 	}
 
 	if err = (&controller.PipelineRunReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: config.GetConfig(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Config:     config.GetConfig(),
+		KiteClient: kiteClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PipelineRun")
 		os.Exit(1)
