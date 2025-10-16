@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -34,6 +35,7 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	"github.com/konflux-ci/mintmaker/internal/pkg/kite"
+	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 )
 
 var (
@@ -44,10 +46,11 @@ var (
 
 // PipelineRunReconciler reconciles a PipelineRun object
 type PipelineRunReconciler struct {
-	Client     client.Client
-	Scheme     *runtime.Scheme
-	Config     *config.ControllerConfig
-	KiteClient *kite.Client
+	Client       client.Client
+	K8sClientset *kubernetes.Clientset
+	Scheme       *runtime.Scheme
+	Config       *config.ControllerConfig
+	KiteClient   *kite.Client
 }
 
 func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -55,6 +58,8 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *PipelineRunReconciler) handlePipelinerunCompletion(ctx context.Context, pipelineRun *tektonv1.PipelineRun) error {
+	log := ctrl.Log.WithName("PipelineRunController")
+
 	condition := pipelineRun.Status.GetCondition(apis.ConditionSucceeded)
 	if condition == nil {
 		return fmt.Errorf("PipelineRun condition is nil")
@@ -80,28 +85,33 @@ func (r *PipelineRunReconciler) handlePipelinerunCompletion(ctx context.Context,
 	pipelineIdentifier := fmt.Sprintf("%s/%s", component.Spec.Source.GitSource.URL, component.Spec.Source.GitSource.Revision)
 
 	// Check if the PipelineRun failed or succeeded and send the appropriate webhook
-	log := ctrl.Log.WithName("PipelineRunController")
+	var kiteErr error
 	if condition.IsTrue() {
-		if err := r.sendSuccessWebhook(ctx, pipelineRun, pipelineIdentifier); err != nil {
-			return err
-		} else {
-			log.Info("Succesfully sent PipelineRun success webhook", "pipelineRun", pipelineRun.Name, "pipelineIdentifier", pipelineIdentifier)
-		}
+		kiteErr = r.sendSuccessWebhook(ctx, pipelineRun, pipelineIdentifier)
 	} else {
-		if err := r.sendFailureWebhook(ctx, pipelineRun, pipelineIdentifier); err != nil {
-			return err
-		} else {
-			// Log the failure reason
-			reason := pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
-			log.Info("Succesfully sent PipelineRun failure webhook", "pipelineRun", pipelineRun.Name, "reason", reason, "pipelineIdentifier", pipelineIdentifier)
-		}
+		kiteErr = r.sendFailureWebhook(ctx, pipelineRun, pipelineIdentifier)
 	}
+
+	if kiteErr != nil {
+		return kiteErr
+	}
+
+	log.Info("Successfully sent PipelineRun status to KITE webhook", "pipelineRun", pipelineRun.Name, "pipelineIdentifier", pipelineIdentifier)
 	return nil
 }
 
 func (r *PipelineRunReconciler) sendFailureWebhook(ctx context.Context, pipelineRun *tektonv1.PipelineRun, pipelineIdentifier string) error {
+	log := ctrl.Log.WithName("PipelineRunController")
+
 	// Get failure reason
-	reason := pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
+	podDetails, err := utils.GetFailedPodDetails(ctx, r.Client, r.K8sClientset, pipelineRun)
+	var reason string
+	if err != nil {
+		log.Error(err, "Failed to get failed Pod details", "pipelineRun", pipelineRun.Name)
+		reason = pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
+	} else {
+		reason = podDetails.Log
+	}
 
 	payload := kite.PipelineFailurePayload{
 		PipelineName:  pipelineIdentifier,
@@ -144,9 +154,12 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if newPipelineRun, ok := e.ObjectNew.(*tektonv1.PipelineRun); ok {
 						if !oldPipelineRun.IsDone() && newPipelineRun.IsDone() {
 							if newPipelineRun.Status.CompletionTime != nil {
+								ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+								defer cancel()
+
 								log := ctrl.Log.WithName("PipelineRunController")
 								// send PipelineRun completion status to KITE webhook
-								if err := r.handlePipelinerunCompletion(context.Background(), newPipelineRun); err != nil {
+								if err := r.handlePipelinerunCompletion(ctx, newPipelineRun); err != nil {
 									log.Error(err, "Failed to send PipelineRun status to KITE", "pipelineRun", newPipelineRun.Name)
 								}
 
