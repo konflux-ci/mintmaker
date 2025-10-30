@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -111,25 +113,18 @@ func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	return verStr, nil
 }
 
-// SendPipelineFailure sends a pipeline failure event to KITE webhook
-func (c *Client) SendPipelineFailure(ctx context.Context, payload PipelineFailurePayload) error {
-	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-failure?namespace=%s", c.baseURL, payload.Namespace)
-
-	jsonPayload, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
+func (c *Client) SendWebhookRequest(ctx context.Context, namespace string, webhookName string, payload []byte) error {
+	u, err := url.Parse(c.baseURL)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("invalid base URL: %w", err)
 	}
+	u.Path = path.Join(u.Path, "api/v1/webhooks", webhookName)
 
-	return c.sendRequest(req, nil)
-}
+	q := u.Query()
+	q.Set("namespace", namespace)
+	u.RawQuery = q.Encode()
 
-// SendPipelineSuccess sends a pipeline success event to KITE webhook
-func (c *Client) SendPipelineSuccess(ctx context.Context, payload PipelineSuccessPayload) error {
-	url := fmt.Sprintf("%s/api/v1/webhooks/pipeline-success?namespace=%s", c.baseURL, payload.Namespace)
-
-	jsonPayload, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

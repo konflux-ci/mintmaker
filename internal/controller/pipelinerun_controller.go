@@ -16,11 +16,13 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"knative.dev/pkg/apis"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -33,6 +35,7 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	"github.com/konflux-ci/mintmaker/internal/pkg/doctor"
 	"github.com/konflux-ci/mintmaker/internal/pkg/kite"
 )
 
@@ -45,6 +48,7 @@ var (
 // PipelineRunReconciler reconciles a PipelineRun object
 type PipelineRunReconciler struct {
 	Client     client.Client
+	Clientset  *kubernetes.Clientset
 	Scheme     *runtime.Scheme
 	Config     *config.ControllerConfig
 	KiteClient *kite.Client
@@ -55,6 +59,8 @@ func (r *PipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *PipelineRunReconciler) handlePipelinerunCompletion(ctx context.Context, pipelineRun *tektonv1.PipelineRun) error {
+	log := ctrl.Log.WithName("PipelineRunController")
+
 	condition := pipelineRun.Status.GetCondition(apis.ConditionSucceeded)
 	if condition == nil {
 		return fmt.Errorf("PipelineRun condition is nil")
@@ -79,48 +85,61 @@ func (r *PipelineRunReconciler) handlePipelinerunCompletion(ctx context.Context,
 	// Construct a unique pipeline identifier using the Git URL and revision (branch)
 	pipelineIdentifier := fmt.Sprintf("%s/%s", component.Spec.Source.GitSource.URL, component.Spec.Source.GitSource.Revision)
 
-	// Check if the PipelineRun failed or succeeded and send the appropriate webhook
-	log := ctrl.Log.WithName("PipelineRunController")
-	if condition.IsTrue() {
-		if err := r.sendSuccessWebhook(ctx, pipelineRun, pipelineIdentifier); err != nil {
-			return err
-		} else {
-			log.Info("Succesfully sent PipelineRun success webhook", "pipelineRun", pipelineRun.Name, "pipelineIdentifier", pipelineIdentifier)
-		}
+	podDetails, err := doctor.GetFailedPodDetails(ctx, r.Client, r.Clientset, pipelineRun)
+	var failReason string
+	if err != nil {
+		log.Error(err, "Failed to get failed Pod details", "pipelineRun", pipelineRun.Name)
+		failReason = pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
 	} else {
-		if err := r.sendFailureWebhook(ctx, pipelineRun, pipelineIdentifier); err != nil {
-			return err
-		} else {
-			// Log the failure reason
-			reason := pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
-			log.Info("Succesfully sent PipelineRun failure webhook", "pipelineRun", pipelineRun.Name, "reason", reason, "pipelineIdentifier", pipelineIdentifier)
-		}
+		failReason = podDetails.FailureLogs
 	}
+
+	// Check if the PipelineRun failed or succeeded and send the appropriate webhook
+	var kiteErr error
+	if condition.IsTrue() {
+		kiteErr = r.sendSuccessWebhook(ctx, pipelineRun, pipelineIdentifier)
+	} else {
+		kiteErr = r.sendFailureWebhook(ctx, pipelineRun, pipelineIdentifier, failReason)
+	}
+
+	if kiteErr != nil {
+		return kiteErr
+	}
+
+	log.Info("Successfully sent PipelineRun status to KITE webhook", "pipelineRun", pipelineRun.Name, "pipelineIdentifier", pipelineIdentifier)
 	return nil
 }
 
-func (r *PipelineRunReconciler) sendFailureWebhook(ctx context.Context, pipelineRun *tektonv1.PipelineRun, pipelineIdentifier string) error {
-	// Get failure reason
-	reason := pipelineRun.Status.GetCondition(apis.ConditionSucceeded).GetReason()
+func (r *PipelineRunReconciler) sendFailureWebhook(ctx context.Context, pipelineRun *tektonv1.PipelineRun, pipelineIdentifier string, failReason string) error {
+	webhookName := "pipeline-failure"
 
 	payload := kite.PipelineFailurePayload{
 		PipelineName:  pipelineIdentifier,
 		Namespace:     pipelineRun.Labels[MintMakerComponentNamespaceLabel],
-		FailureReason: reason,
+		FailureReason: failReason,
 		RunID:         pipelineRun.Name,
 		LogsURL:       "", // Placeholder for logs URL if available
 	}
+	marshaledPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("unable to marshal payload: %w", err)
+	}
 
-	return r.KiteClient.SendPipelineFailure(ctx, payload)
+	return r.KiteClient.SendWebhookRequest(ctx, payload.Namespace, webhookName, marshaledPayload)
 }
 
 func (r *PipelineRunReconciler) sendSuccessWebhook(ctx context.Context, pipelineRun *tektonv1.PipelineRun, pipelineIdentifier string) error {
+	webhookName := "pipeline-success"
 	payload := kite.PipelineSuccessPayload{
 		PipelineName: pipelineIdentifier,
 		Namespace:    pipelineRun.Labels[MintMakerComponentNamespaceLabel],
 	}
+	marshaledPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("unable to marshal payload: %w", err)
+	}
 
-	return r.KiteClient.SendPipelineSuccess(ctx, payload)
+	return r.KiteClient.SendWebhookRequest(ctx, payload.Namespace, webhookName, marshaledPayload)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -144,9 +163,12 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if newPipelineRun, ok := e.ObjectNew.(*tektonv1.PipelineRun); ok {
 						if !oldPipelineRun.IsDone() && newPipelineRun.IsDone() {
 							if newPipelineRun.Status.CompletionTime != nil {
+								ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+								defer cancel()
+
 								log := ctrl.Log.WithName("PipelineRunController")
 								// send PipelineRun completion status to KITE webhook
-								if err := r.handlePipelinerunCompletion(context.Background(), newPipelineRun); err != nil {
+								if err := r.handlePipelinerunCompletion(ctx, newPipelineRun); err != nil {
 									log.Error(err, "Failed to send PipelineRun status to KITE", "pipelineRun", newPipelineRun.Name)
 								}
 
