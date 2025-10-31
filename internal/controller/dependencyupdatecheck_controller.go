@@ -263,6 +263,29 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 		resources = append(resources, rpmSecret)
 	}
 
+	// Create Secret to access RPMs that require SSL cert authentication
+	sslCert, sslKey, rpmSslAuthErr := comp.GetRPMSSLAuth(r.Client, ctx)
+	var rpmSslAuthSecret *corev1.Secret = nil
+	if rpmSslAuthErr != nil {
+		log.Info(rpmSslAuthErr.Error())
+	} else {
+		rpmSslAuthSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name + "-rpm-ssl-auth",
+				Namespace: MintMakerNamespaceName,
+			},
+			Type: corev1.SecretTypeOpaque,
+			StringData: map[string]string{
+				"sslcert": sslCert,
+				"sslkey": sslKey,
+			},
+		}
+
+		if err := r.Client.Create(ctx, rpmSslAuthSecret); err != nil {
+			return nil, err
+		}
+		resources = append(resources, rpmSslAuthSecret)
+	}
 	// Creating the pipelineRun definition
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
@@ -308,7 +331,20 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 		rpmSecretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"prepare-rpm-cert"})
 		builder.WithSecret(name+"-rpm-key", "/etc/renovate/secret", rpmSecretItems, rpmSecretOpts)
 	}
-
+	if rpmSslAuthErr == nil {
+		rpmSslAuthSecretItems := []corev1.KeyToPath{
+			{
+				Key:  "sslkey",
+				Path: "rpm-ssl-auth-key",
+			},
+			{
+				Key:  "sslcert",
+				Path: "rpm-ssl-auth-cert",
+			},
+		}
+		rpmSslAuthSecretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"prepare-rpm-ssl-auth-cert"})
+		builder.WithSecret(name+"-rpm-ssl-auth", "/etc/renovate/ssl-auth-secret", rpmSslAuthSecretItems, rpmSslAuthSecretOpts)
+	}
 	// Check if a ConfigMap with the label `config.openshift.io/inject-trusted-cabundle: "true"` exists.
 	// If such a ConfigMap is found, add a volume to the PipelineRun specification to mount this ConfigMap.
 	// The volume will be mounted at '/etc/pki/ca-trust/extracted/pem' within the PipelineRun Pod.
@@ -366,7 +402,15 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 			return nil, err
 		}
 	}
-
+	// ownership for RPM SSL Auth secret
+	if rpmSslAuthErr == nil {
+		if err := controllerutil.SetOwnerReference(pipelineRun, rpmSslAuthSecret, r.Scheme); err != nil {
+			return nil, err
+		}
+		if err := r.Client.Update(ctx, rpmSslAuthSecret); err != nil {
+			return nil, err
+		}
+	}
 	// ownership for the renovateConfigMap
 	if err := controllerutil.SetOwnerReference(pipelineRun, renovateConfigMap, r.Scheme); err != nil {
 		return nil, err
