@@ -16,6 +16,7 @@
   "pruneStaleBranches": true,
   "parallelRunPruneStaleBranches": true,
   "branchConcurrentLimit": 0,
+  "prConcurrentLimit": 20,
   "configMigration": true,
   "containerVulnerabilityAlerts": true,
   "rpmVulnerabilityAlerts": true,
