@@ -177,7 +177,7 @@ func getActivationKeyFromSecret(secret *corev1.Secret) (string, string, error) {
 }
 
 // returns two strings, activationkey and org
-func (c *BaseComponent) GetRPMActivationKey(k8sClient client.Client, ctx context.Context) (string, string, error) {
+func (c *BaseComponent) GetRPMActivationKey(ctx context.Context, k8sClient client.Client) (string, string, error) {
 
 	defaultSecret := &corev1.Secret{}
 	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: "activation-key"}, defaultSecret); err != nil {

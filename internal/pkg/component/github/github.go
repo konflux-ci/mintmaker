@@ -65,7 +65,7 @@ type Component struct {
 	ctx           context.Context
 }
 
-func getAppIDAndKey(client client.Client, ctx context.Context) (int64, []byte, error) {
+func getAppIDAndKey(ctx context.Context, client client.Client) (int64, []byte, error) {
 	if ghAppID != 0 && ghAppPrivateKey != nil {
 		return ghAppID, ghAppPrivateKey, nil
 	}
@@ -86,8 +86,8 @@ func getAppIDAndKey(client client.Client, ctx context.Context) (int64, []byte, e
 	return ghAppID, ghAppPrivateKey, nil
 }
 
-func NewComponent(comp *appstudiov1alpha1.Component, client client.Client, ctx context.Context) (*Component, error) {
-	appID, appPrivateKey, err := getAppIDAndKey(client, ctx)
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (*Component, error) {
+	appID, appPrivateKey, err := getAppIDAndKey(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
 	}
@@ -328,7 +328,7 @@ func (c *Component) GetAPIEndpoint() string {
 }
 
 func (c *Component) getAppSlug() (string, error) {
-	appID, appPrivateKey, err := getAppIDAndKey(c.client, c.ctx)
+	appID, appPrivateKey, err := getAppIDAndKey(c.ctx, c.client)
 	if err != nil {
 		return "", err
 	}

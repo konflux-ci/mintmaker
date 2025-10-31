@@ -46,7 +46,7 @@ type Repository struct {
 	Repository   string
 }
 
-func NewComponent(comp *appstudiov1alpha1.Component, client client.Client, ctx context.Context) (*Component, error) {
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (*Component, error) {
 	giturl := comp.Spec.Source.GitSource.URL
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)

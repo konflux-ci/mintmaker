@@ -40,10 +40,10 @@ type GitComponent interface {
 	GetBranch() (string, error)
 	GetAPIEndpoint() string
 	GetRenovateConfig(*corev1.Secret) (string, error)
-	GetRPMActivationKey(client.Client, context.Context) (string, string, error)
+	GetRPMActivationKey(context.Context, client.Client) (string, string, error)
 }
 
-func NewGitComponent(comp *appstudiov1alpha1.Component, client client.Client, ctx context.Context) (GitComponent, error) {
+func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (GitComponent, error) {
 	// First check if source url exists and is properly defined
 	if comp.Spec.Source.GitSource == nil || comp.Spec.Source.GitSource.URL == "" {
 		return nil, fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
@@ -55,13 +55,13 @@ func NewGitComponent(comp *appstudiov1alpha1.Component, client client.Client, ct
 
 	switch platform {
 	case "github":
-		c, err := github.NewComponent(comp, client, ctx)
+		c, err := github.NewComponent(ctx, comp, client)
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
 		return c, nil
 	case "gitlab":
-		c, err := gitlab.NewComponent(comp, client, ctx)
+		c, err := gitlab.NewComponent(ctx, comp, client)
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}

@@ -197,7 +197,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		// Create GitComponent from Component
-		gitComp, err := component.NewGitComponent(&comp, r.Client, ctx)
+		gitComp, err := component.NewGitComponent(ctx, &comp, r.Client)
 		if err != nil {
 			errMessage = err.Error()
 			// Do not requeue, the error is not related to the cluster issues

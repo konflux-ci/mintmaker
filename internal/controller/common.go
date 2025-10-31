@@ -23,7 +23,7 @@ import (
 )
 
 // Get only components that match a given namespace/application/componentname
-func getFilteredComponents(namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client, ctx context.Context) ([]appstudiov1alpha1.Component, error) {
+func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client) ([]appstudiov1alpha1.Component, error) {
 	components := []appstudiov1alpha1.Component{}
 	err := error(nil)
 

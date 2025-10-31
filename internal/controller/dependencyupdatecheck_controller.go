@@ -92,7 +92,7 @@ func (r *DependencyUpdateCheckReconciler) getCAConfigMap(ctx context.Context) (*
 
 // Returns a merged docker config that contains all image registry secrets
 // linked to the component's build-pipeline ServiceAccount.
-func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(comp component.GitComponent, ctx context.Context) ([]byte, error) {
+func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.Context, comp component.GitComponent) ([]byte, error) {
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
 
@@ -163,7 +163,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(comp compone
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp component.GitComponent, ctx context.Context) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
 	ctx = ctrllog.IntoContext(ctx, log)
@@ -204,7 +204,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 	}
 
 	// Add a merged docker config to the renovateSecret
-	mergedDockerConfigJson, err := r.getMergedDockerConfigJson(comp, ctx)
+	mergedDockerConfigJson, err := r.getMergedDockerConfigJson(ctx, comp)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("failed to get a merged docker config for the component %s", comp.GetName()))
 		return nil, err
@@ -240,7 +240,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(name string, comp co
 	resources = append(resources, renovateConfigMap)
 
 	// Create Secret for RPM activation key to access RPMs that require subscription
-	activationKey, org, rpmKeyErr := comp.GetRPMActivationKey(r.Client, ctx)
+	activationKey, org, rpmKeyErr := comp.GetRPMActivationKey(ctx, r.Client)
 	var rpmSecret *corev1.Secret = nil
 	if rpmKeyErr != nil {
 		log.Info(rpmKeyErr.Error())
@@ -433,7 +433,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	var gatheredComponents []appstudiov1alpha1.Component
 	if len(dependencyupdatecheck.Spec.Namespaces) > 0 {
 		log.Info(fmt.Sprintf("Following components are specified: %v", dependencyupdatecheck.Spec.Namespaces))
-		gatheredComponents, err = getFilteredComponents(dependencyupdatecheck.Spec.Namespaces, r.Client, ctx)
+		gatheredComponents, err = getFilteredComponents(ctx, dependencyupdatecheck.Spec.Namespaces, r.Client)
 		if err != nil {
 			log.Error(err, "gathering filtered components has failed")
 			return ctrl.Result{}, err
@@ -467,7 +467,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 	timestamp := time.Now().UTC().Format("01021504") // MMDDhhmm, from Go's time formatting reference date "20060102150405"
 	for _, appstudioComponent := range componentList {
-		comp, err := component.NewGitComponent(&appstudioComponent, r.Client, ctx)
+		comp, err := component.NewGitComponent(ctx, &appstudioComponent, r.Client)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("failed to handle component: %s", appstudioComponent.Name))
 			continue
@@ -496,7 +496,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-		pipelinerun, err := r.createPipelineRun(plrName, comp, ctx)
+		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp)
 		if err != nil {
 			log.Error(err, "failed to create PipelineRun",
 				"component", appstudioComponent.Name,
