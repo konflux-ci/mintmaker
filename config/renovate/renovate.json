@@ -529,7 +529,10 @@
         "pipeline-migration-tool migrate -f \"$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\""
       ],
       "executionMode": "branch",
-      "dataFileTemplate": "[{{#each upgrades}}{\"depName\": \"{{{depName}}}\", \"currentValue\": \"{{{currentValue}}}\", \"currentDigest\": \"{{{currentDigest}}}\", \"newValue\": \"{{{newValue}}}\", \"newDigest\": \"{{{newDigest}}}\", \"packageFile\": \"{{{packageFile}}}\", \"parentDir\": \"{{{parentDir}}}\", \"depTypes\": [{{#each depTypes}}\"{{{this}}}\"{{#unless @last}},{{\/unless}}{{\/each}}]}{{#unless @last}},{{\/unless}}{{\/each}}]"
+      "dataFileTemplate": "[{{#each upgrades}}{\"depName\": \"{{{depName}}}\", \"currentValue\": \"{{{currentValue}}}\", \"currentDigest\": \"{{{currentDigest}}}\", \"newValue\": \"{{{newValue}}}\", \"newDigest\": \"{{{newDigest}}}\", \"packageFile\": \"{{{packageFile}}}\", \"parentDir\": \"{{{parentDir}}}\", \"depTypes\": [{{#each depTypes}}\"{{{this}}}\"{{#unless @last}},{{\/unless}}{{\/each}}]}{{#unless @last}},{{\/unless}}{{\/each}}]",
+      "fileFilters": [
+        "**/*.y*ml"
+      ]
     }
   },
   "dockerfile": {
