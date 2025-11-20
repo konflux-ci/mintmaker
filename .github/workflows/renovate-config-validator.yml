@@ -9,10 +9,18 @@ on:
       - main
 
 jobs:
-  renovate-config-file-validation:
+  validate-user-config:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: konflux-ci/renovate-config-validator-action@main
         with:
           config_file: .github/renovate.json
+
+  validate-backend-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: konflux-ci/renovate-config-validator-action@main
+        with:
+          config_file: config/renovate/renovate.json
