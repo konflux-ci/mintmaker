@@ -93,18 +93,17 @@ func (r *DependencyUpdateCheckReconciler) getCAConfigMap(ctx context.Context) (*
 // Returns a merged docker config that contains all image registry secrets
 // linked to the component's build-pipeline ServiceAccount.
 func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.Context, comp component.GitComponent) ([]byte, error) {
-	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
-	ctx = ctrllog.IntoContext(ctx, log)
+	log := ctrllog.FromContext(ctx).WithName("getMergedDockerConfigJson")
 
 	componentNamespace := comp.GetNamespace()
 	serviceAccountName := "build-pipeline-" + comp.GetName()
 	serviceAccount := &corev1.ServiceAccount{}
 	if err := r.APIReader.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: serviceAccountName}, serviceAccount); err != nil {
 		if errors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("service account %s not found in namespace %s", serviceAccountName, componentNamespace))
+			log.Info("service account not found in component namespace", "service-account", serviceAccountName)
 			return nil, nil
 		}
-		log.Error(err, fmt.Sprintf("unable to get service account %s in namespace %s", serviceAccountName, componentNamespace))
+		log.Error(err, "unable to get service account in component namespace", "service-account", serviceAccountName)
 		return nil, err
 	}
 
@@ -113,10 +112,10 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 		var secret corev1.Secret
 		if err := r.APIReader.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: secretRef.Name}, &secret); err != nil {
 			if errors.IsNotFound(err) {
-				log.Info(fmt.Sprintf("secret %s not found in namespace %s", secretRef.Name, componentNamespace))
+				log.Info("secret not found in component namespace", "secret", secretRef.Name)
 				continue
 			}
-			log.Error(err, fmt.Sprintf("unable to get secret %s in namespace %s", secretRef.Name, componentNamespace))
+			log.Error(err, "unable to get secret in component namespace", "secret", secretRef.Name)
 			return nil, err
 		}
 
@@ -130,7 +129,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 
 		data, exists := secret.Data[corev1.DockerConfigJsonKey]
 		if !exists {
-			log.Info(fmt.Sprintf("skipping secret %s with missing %s section", secret.Name, corev1.DockerConfigJsonKey))
+			log.Info("skipping secret with missing section", "secret", secret.Name, "section", corev1.DockerConfigJsonKey)
 			continue
 		}
 		var dockerConfig map[string]interface{}
@@ -148,7 +147,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 	}
 
 	if len(mergedAuths) == 0 {
-		log.Info(fmt.Sprintf("merged auths empty for component %s", comp.GetName()))
+		log.Info("merged auths empty for component")
 		return nil, nil
 	}
 
@@ -165,8 +164,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 // createPipelineRun creates and returns a new PipelineRun
 func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent) (*tektonv1.PipelineRun, error) {
 
-	log := ctrllog.FromContext(ctx).WithName("DependencyUpdateCheckController")
-	ctx = ctrllog.IntoContext(ctx, log)
+	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
 
 	var resources []client.Object
 	defer func() {
@@ -206,7 +204,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	// Add a merged docker config to the renovateSecret
 	mergedDockerConfigJson, err := r.getMergedDockerConfigJson(ctx, comp)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("failed to get a merged docker config for the component %s", comp.GetName()))
+		log.Error(err, "failed to get a merged docker config for component")
 		return nil, err
 	}
 	if len(mergedDockerConfigJson) != 0 {
@@ -467,9 +465,12 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 	timestamp := time.Now().UTC().Format("01021504") // MMDDhhmm, from Go's time formatting reference date "20060102150405"
 	for _, appstudioComponent := range componentList {
+		log = log.WithValues("component", appstudioComponent.Name,
+			"componentNamespace", appstudioComponent.Namespace)
+
 		comp, err := component.NewGitComponent(ctx, &appstudioComponent, r.Client)
 		if err != nil {
-			log.Error(err, fmt.Sprintf("failed to handle component: %s", appstudioComponent.Name))
+			log.Error(err, "failed to handle component")
 			continue
 		}
 
@@ -481,15 +482,14 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		repository := comp.GetRepository()
 		key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
 
-		log.Info("check if PipelineRun has been created",
-			"key", key,
-			"component", appstudioComponent.Name,
+		log = log.WithValues("repository", repository,
 			"branch", branch,
-			"repository", repository,
-			"host", host)
+			"gitHost", host)
+		ctx = ctrllog.IntoContext(ctx, log)
 
 		if slices.Contains(processedComponents, key) {
 			// PipelineRun has already been created for this repo-branch
+			log.Info("PipelineRun has been created for this component-key", "component-key", key)
 			continue
 		} else {
 			processedComponents = append(processedComponents, key)
@@ -498,19 +498,10 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
 		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp)
 		if err != nil {
-			log.Error(err, "failed to create PipelineRun",
-				"component", appstudioComponent.Name,
-				"branch", branch,
-				"repository", repository,
-				"host", host)
+			log.Error(err, "failed to create PipelineRun")
 			mintmakermetrics.CountScheduledRunFailure()
 		} else {
-			log.Info("created PipelineRun",
-				"component", appstudioComponent.Name,
-				"branch", branch,
-				"repository", repository,
-				"host", host,
-				"PipelineRun", pipelinerun.Name)
+			log.Info("created PipelineRun", "pipelineRun", pipelinerun.Name)
 			mintmakermetrics.CountScheduledRunSuccess()
 		}
 	}

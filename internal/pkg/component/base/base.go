@@ -84,7 +84,7 @@ func (c *BaseComponent) GetHostRules(ctx context.Context, registrySecret *corev1
 	log := logger.FromContext(ctx)
 
 	if _, exists := registrySecret.Data[corev1.DockerConfigJsonKey]; !exists {
-		return nil, errors.New(fmt.Sprintf("Secret %s is missing the %s key", registrySecret.Name, corev1.DockerConfigJsonKey))
+		return nil, fmt.Errorf("secret %s is missing the %s key", registrySecret.Name, corev1.DockerConfigJsonKey)
 	}
 
 	var hostRules []HostRule
@@ -113,7 +113,7 @@ func (c *BaseComponent) GetHostRules(ctx context.Context, registrySecret *corev1
 
 			if !found {
 				log.Info("Could not find delimiter in auth")
-				return nil, errors.New("Could not find delimiter in auth")
+				return nil, errors.New("could not find delimiter in auth")
 			}
 
 			hostRule["username"] = username
@@ -181,7 +181,10 @@ func (c *BaseComponent) GetRPMActivationKey(ctx context.Context, k8sClient clien
 
 	defaultSecret := &corev1.Secret{}
 	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: "activation-key"}, defaultSecret); err != nil {
-		defaultSecret = &corev1.Secret{}
+		// If the Get() fails (secret doesn't exist), set defaultSecret to nil, so getActivationKeyFromSecret()
+		// can distinguish between "no secret" vs "invalid secret". An empty Secret object would pass
+		// the nil check but have empty metadata (including Name), resulting in confusing error messages.
+		defaultSecret = nil
 	}
 
 	secretList := &corev1.SecretList{}

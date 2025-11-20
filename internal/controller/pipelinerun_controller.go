@@ -16,7 +16,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,7 +73,11 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							if newPipelineRun.Status.CompletionTime != nil {
 								log := ctrl.Log.WithName("PipelineRunController")
 								log.Info(
-									fmt.Sprintf("PipelineRun finished: %s", newPipelineRun.Name),
+									"PipelineRun finished", "pipelineRun", newPipelineRun.Name,
+									"component", newPipelineRun.Labels[MintMakerComponentNameLabel],
+									"componentNamespace", newPipelineRun.Labels[MintMakerComponentNamespaceLabel],
+									"repository", strings.ReplaceAll(newPipelineRun.Labels["mintmaker.appstudio.redhat.com/repository"], "_", "/"),
+									"gitHost", newPipelineRun.Labels["mintmaker.appstudio.redhat.com/git-host"],
 									"completionTime",
 									newPipelineRun.Status.CompletionTime.Format(time.RFC3339),
 									"success",

@@ -17,6 +17,7 @@ package controller
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -110,9 +111,9 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			patch := client.MergeFrom(original)
 			err := r.Patch(ctx, &plr, patch)
 			if err != nil {
-				log.Error(err, "unable to cancel pipelinerun", "pipelinerun", plr.Name)
+				log.Error(err, "unable to cancel pipelinerun")
 			} else {
-				log.Info("pipelinerun is cancelled", "pipelinerun", plr.Name, "reason", errMessage)
+				log.Info("pipelinerun is cancelled", "reason", errMessage)
 			}
 		}
 	}()
@@ -151,6 +152,14 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
+	log = log.WithValues(
+		"component", pod.Labels[MintMakerComponentNameLabel],
+		"componentNamespace", pod.Labels[MintMakerComponentNamespaceLabel],
+		"pipelineRun", pod.Labels["tekton.dev/pipelineRun"],
+		"repository", strings.ReplaceAll(pod.Labels["mintmaker.appstudio.redhat.com/repository"], "_", "/"),
+		"gitHost", pod.Labels["mintmaker.appstudio.redhat.com/git-host"],
+	)
+	ctx = ctrllog.IntoContext(ctx, log)
 	// Find the corresponding secret
 	var secretName string
 	for _, volume := range pod.Spec.Volumes {
@@ -207,7 +216,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		// When this is a GitHub component, it also refreshes token if needed
 		token, err := gitComp.GetToken()
 		if err != nil {
-			log.Error(err, "failed to generate token for component", "component", comp.Name)
+			log.Error(err, "failed to generate token for component")
 			errMessage = err.Error()
 			// Do not requeue, the error is probably caused by Konflux GitHub
 			// installation issue, which retry won't help
