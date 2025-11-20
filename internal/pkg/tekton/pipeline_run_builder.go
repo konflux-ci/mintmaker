@@ -23,6 +23,7 @@ import (
 	"unicode"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -161,9 +162,14 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 											},
 										},
 										{
-											Name:   "renovate",
-											Image:  renovateImageURL,
-											Script: `RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) RENOVATE_CONFIG_FILE=/etc/renovate/config/config.js renovate`,
+											Name:  "renovate",
+											Image: renovateImageURL,
+											Script: ` 
+												RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) \
+												RENOVATE_CONFIG_FILE=/etc/renovate/config/config.js \
+												LOG_FILE=/workspace/shared-data/renovate-logs.json \
+												renovate || true
+												`,
 											SecurityContext: &corev1.SecurityContext{
 												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 												RunAsNonRoot:             ptr.To(true),
@@ -208,6 +214,75 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												{
 													Name:  "DNF_VAR_SSL_CLIENT_CERT",
 													Value: "/workspace/shared-data/rpm-certs/cert.pem",
+												},
+											},
+										},
+										{ // Run even if step-renovate fails
+											Name:   "log-analyzer",
+											Image:  "quay.io/konflux-ci/renovate-log-analyzer:latest",
+											Script: "",
+											SecurityContext: &corev1.SecurityContext{
+												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+												RunAsNonRoot:             ptr.To(true),
+												RunAsUser:                &normalUser,
+												AllowPrivilegeEscalation: ptr.To(false),
+											},
+											Env: []corev1.EnvVar{
+												{
+													Name: "POD_NAME",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.name",
+														},
+													},
+												},
+												{
+													Name: "NAMESPACE",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/namespace']",
+														},
+													},
+												},
+												{
+													Name: "GIT_HOST",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/git-host']",
+														},
+													},
+												},
+												{
+													Name: "REPOSITORY",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/repository']",
+														},
+													},
+												},
+												{
+													Name: "BRANCH",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/branch']",
+														},
+													},
+												},
+												{
+													Name: "PIPELINE_RUN",
+													ValueFrom: &corev1.EnvVarSource{
+														FieldRef: &corev1.ObjectFieldSelector{
+															FieldPath: "metadata.labels['tekton.dev/pipelineRun']",
+														},
+													},
+												},
+												{
+													Name:  "KITE_API_URL",
+													Value: getKiteAPIURL(config.GetConfig()), // Use config with fallback
+												},
+												{
+													Name:  "LOG_FILE",
+													Value: "/workspace/shared-data/renovate-logs.json",
 												},
 											},
 										},
@@ -454,4 +529,11 @@ func (b *PipelineRunBuilder) WithTimeouts(timeouts *tektonv1.TimeoutFields) *Pip
 		b.pipelineRun.Spec.Timeouts = timeouts
 	}
 	return b
+}
+
+func getKiteAPIURL(config *config.ControllerConfig) string {
+	if config != nil && config.GlobalConfig.KiteAPIURL != "" {
+		return config.GlobalConfig.KiteAPIURL
+	}
+	return "" // Will cause error if not set, which is good
 }

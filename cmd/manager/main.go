@@ -17,13 +17,13 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -43,7 +43,6 @@ import (
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/controller"
 	"github.com/konflux-ci/mintmaker/internal/pkg/config"
-	"github.com/konflux-ci/mintmaker/internal/pkg/kite"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
@@ -70,7 +69,6 @@ func main() {
 	var enableHTTP2 bool
 	var pprofAddr string
 	var tlsOpts []func(*tls.Config)
-	var kiteAPIURL string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -82,7 +80,6 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&kiteAPIURL, "kite-api-url", "", "KITE API base URL")
 	opts := zap.Options{
 		Development: false,
 	}
@@ -178,20 +175,6 @@ func main() {
 		setupLog.Info("pprof server disabled", "reason", "ENABLE_PPROFLING env var not set to 'true'")
 	}
 
-	// Create KITE client
-	kiteClient, err := kite.NewClient(kiteAPIURL)
-	if err != nil {
-		setupLog.Error(err, "failed to create KITE API client")
-	} else {
-		// Log KITE API version
-		ver, err := kiteClient.GetVersion(ctx)
-		if err != nil {
-			setupLog.Error(err, "failed to get KITE API version")
-		} else {
-			setupLog.Info(fmt.Sprintf("KITE API version: %s", ver))
-		}
-	}
-
 	if err = (&controller.DependencyUpdateCheckReconciler{
 		Client:    mgr.GetClient(),
 		APIReader: mgr.GetAPIReader(),
@@ -203,10 +186,9 @@ func main() {
 	}
 
 	if err = (&controller.PipelineRunReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		Config:     config.GetConfig(),
-		KiteClient: kiteClient,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Config: config.GetConfig(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PipelineRun")
 		os.Exit(1)
