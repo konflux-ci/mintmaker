@@ -176,7 +176,7 @@ func (c *Component) GetToken() (string, error) {
 	}
 
 	tokenKey := fmt.Sprintf("installation_%d", installationID)
-	cfg := config.GetConfig().GlobalConfig
+	cfg := config.Get().GitHub
 	if ghAppInstallationTokenCache.entries == nil {
 		ghAppInstallationTokenCache.entries = make(map[string]TokenInfo)
 	}
@@ -200,7 +200,7 @@ func (c *Component) GetToken() (string, error) {
 		return "", fmt.Errorf("error getting installation token: %w", err)
 	}
 	tokenInfo := TokenInfo{
-		Token: token, ExpiresAt: time.Now().Add(cfg.GhTokenValidity),
+		Token: token, ExpiresAt: time.Now().Add(cfg.TokenTTL),
 	}
 	ghAppInstallationTokenCache.Set(tokenKey, tokenInfo)
 

@@ -181,9 +181,14 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 											},
 										},
 										{
-											Name:   "renovate",
-											Image:  renovateImageURL,
-											Script: `RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) RENOVATE_CONFIG_FILE=/etc/renovate/config/config.js renovate`,
+											Name:  "renovate",
+											Image: renovateImageURL,
+											Script: `
+												RENOVATE_TOKEN=$(cat /etc/renovate/secret/renovate-token) \
+												RENOVATE_CONFIG_FILE=/etc/renovate/config/config.js \
+												LOG_FILE=/workspace/shared-data/renovate-logs.json \
+												renovate || true
+												`,
 											SecurityContext: &corev1.SecurityContext{
 												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 												RunAsNonRoot:             ptr.To(true),
@@ -472,6 +477,91 @@ func (b *PipelineRunBuilder) WithTimeouts(timeouts *tektonv1.TimeoutFields) *Pip
 		b.pipelineRun.Spec.Timeouts = defaultTimeouts
 	} else {
 		b.pipelineRun.Spec.Timeouts = timeouts
+	}
+	return b
+}
+
+// WithKiteIntegration adds a log-analyzer step to analyzing Renovate logs and create issues
+// in Kite
+func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRunBuilder {
+	var normalUser int64 = 1001120000
+
+	// Find the build task and add log-analyzer step
+	for i, task := range b.pipelineRun.Spec.PipelineSpec.Tasks {
+		if task.Name == "build" && task.TaskSpec != nil {
+			steps := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps
+			logAnalyzerStep := tektonv1.Step{
+				Name:   "log-analyzer",
+				Image:  "quay.io/konflux-ci/renovate-log-analyzer:latest",
+				Script: "",
+				SecurityContext: &corev1.SecurityContext{
+					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+					RunAsNonRoot:             ptr.To(true),
+					RunAsUser:                &normalUser,
+					AllowPrivilegeEscalation: ptr.To(false),
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.name",
+							},
+						},
+					},
+					{
+						Name: "NAMESPACE",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/namespace']",
+							},
+						},
+					},
+					{
+						Name: "GIT_HOST",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/git-host']",
+							},
+						},
+					},
+					{
+						Name: "REPOSITORY",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/repository']",
+							},
+						},
+					},
+					{
+						Name: "BRANCH",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/branch']",
+							},
+						},
+					},
+					{
+						Name: "PIPELINE_RUN",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['tekton.dev/pipelineRun']",
+							},
+						},
+					},
+					{
+						Name:  "KITE_API_URL",
+						Value: kiteAPIURL,
+					},
+					{
+						Name:  "LOG_FILE",
+						Value: "/workspace/shared-data/renovate-logs.json",
+					},
+				},
+			}
+			*steps = append(*steps, logAnalyzerStep)
+			break
+		}
 	}
 	return b
 }

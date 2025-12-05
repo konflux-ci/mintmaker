@@ -55,15 +55,13 @@ type DependencyUpdateCheckReconciler struct {
 	Client    client.Client
 	APIReader client.Reader
 	Scheme    *runtime.Scheme
-	Config    *config.ControllerConfig
 }
 
-func NewDependencyUpdateCheckReconciler(client client.Client, apiReader client.Reader, scheme *runtime.Scheme, config *config.ControllerConfig, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
+func NewDependencyUpdateCheckReconciler(client client.Client, apiReader client.Reader, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
 		Client:    client,
 		APIReader: apiReader,
 		Scheme:    scheme,
-		Config:    config,
 	}
 }
 
@@ -262,6 +260,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Creating the pipelineRun definition
+	branch, _ := comp.GetBranch()
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
@@ -270,6 +269,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
+			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(branch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -334,6 +334,11 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 		}
 		secretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
 		builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
+	}
+
+	// Add Kite integration if enabled
+	if cfg := config.Get(); cfg.Kite.Enabled {
+		builder.WithKiteIntegration(cfg.Kite.APIURL)
 	}
 
 	pipelineRun, err := builder.Build()

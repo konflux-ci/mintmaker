@@ -29,7 +29,6 @@ import (
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 
-	"github.com/konflux-ci/mintmaker/internal/pkg/config"
 	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
@@ -43,7 +42,6 @@ var (
 type PipelineRunReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
-	Config *config.ControllerConfig
 }
 
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;list;watch

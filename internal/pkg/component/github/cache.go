@@ -147,9 +147,9 @@ func (c *TokenCache) Get(key string) (TokenInfo, bool) {
 	if !exists {
 		return TokenInfo{}, false
 	}
-	cfg := config.GetConfig().GlobalConfig
+	cfg := config.Get().GitHub
 	// when token is close to expiring, we can't use it
-	if time.Until(entry.ExpiresAt) < cfg.GhTokenRenewThreshold {
+	if time.Until(entry.ExpiresAt) < cfg.TokenMinValidity {
 		return TokenInfo{}, false
 	}
 
