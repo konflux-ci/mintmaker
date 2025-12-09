@@ -145,11 +145,11 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 											ComputeResources: corev1.ResourceRequirements{
 												Requests: corev1.ResourceList{
 													"cpu":    resource.MustParse("100m"),
-													"memory": resource.MustParse("256Mi"),
+													"memory": resource.MustParse("512Mi"),
 												},
 												Limits: corev1.ResourceList{
 													"cpu":    resource.MustParse("100m"),
-													"memory": resource.MustParse("256Mi"),
+													"memory": resource.MustParse("512Mi"),
 												},
 											},
 										},
