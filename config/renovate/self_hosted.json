@@ -4,7 +4,9 @@
   "redisUrl": "redis://redis:6379",
   "customEnvVariables": {
     "GOCACHE": "/tmp/go-build-cache",
-    "GOTOOLCHAIN": "auto"
+    "GOTOOLCHAIN": "auto",
+    "DNF_VAR_SSL_CLIENT_CERT": "/workspace/shared-data/rpm-certs/cert.pem",
+    "DNF_VAR_SSL_CLIENT_KEY": "/workspace/shared-data/rpm-certs/key.pem"
   },
   "repositoryCache": "disabled",
   "repositoryCacheType": "redis://redis:6379/1",
