@@ -26,10 +26,13 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -41,6 +44,7 @@ import (
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/controller"
+	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
@@ -130,7 +134,48 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
+		Scheme: scheme,
+		// Configure client to bypass cache for resources that are NOT watched
+		// and accessed infrequently. This prevents informer creation and reduces
+		// memory consumption.
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					// Core resources accessed infrequently during reconciliation
+					// These are NOT watched, so disabling cache prevents informer creation
+					&corev1.Secret{},
+					&corev1.ServiceAccount{},
+					&corev1.ConfigMap{},
+					&corev1.Pod{},
+					&appstudiov1alpha1.Component{},
+				},
+			},
+		},
+		// Configure cache for WATCHED resources with namespace-scoping and transforms.
+		// These resources need informers for the watch to work, but we only care about
+		// the resources in mintmaker namespace. Strip managed fields to reduce memory.
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&mmv1alpha1.DependencyUpdateCheck{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+					Transform: cache.TransformStripManagedFields(),
+				},
+				&corev1.Event{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+					Transform: cache.TransformStripManagedFields(),
+				},
+				&tektonv1.PipelineRun{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+					Transform: cache.TransformStripManagedFields(),
+				},
+			},
+		},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
@@ -173,9 +218,8 @@ func main() {
 	}
 
 	if err = (&controller.DependencyUpdateCheckReconciler{
-		Client:    mgr.GetClient(),
-		APIReader: mgr.GetAPIReader(),
-		Scheme:    mgr.GetScheme(),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DependencyUpdateCheck")
 		os.Exit(1)
@@ -190,9 +234,8 @@ func main() {
 	}
 
 	if err = (&controller.EventReconciler{
-		Client:    mgr.GetClient(),
-		APIReader: mgr.GetAPIReader(),
-		Scheme:    mgr.GetScheme(),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Event")
 		os.Exit(1)

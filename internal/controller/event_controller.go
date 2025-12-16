@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,14 +32,12 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	component "github.com/konflux-ci/mintmaker/internal/pkg/component"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
 // EventReconciler reconciles a Event object
 type EventReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Scheme    *runtime.Scheme
+	Scheme *runtime.Scheme
 }
 
 // markEventAsProcessed adds an annotation to the event indicating it has been processed
@@ -96,7 +93,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 
 			var plr tektonv1.PipelineRun
-			if err := r.APIReader.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: plrName}, &plr); err != nil {
+			if err := r.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: plrName}, &plr); err != nil {
 				if apierrors.IsNotFound(err) {
 					// The PipelineRun is gone, we can't update it.
 					return
@@ -120,7 +117,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}()
 
-	if err := r.APIReader.Get(ctx, req.NamespacedName, &evt); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, &evt); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -146,7 +143,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	podNamespace := evt.InvolvedObject.Namespace
 
 	// Get the actual corresponding Pod object for this event
-	if err := r.APIReader.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: podName}, &pod); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: podName}, &pod); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Pod has gone, we can't proceed
 			return ctrl.Result{}, nil
@@ -177,7 +174,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// Get the secret
 	var secret corev1.Secret
-	if err := r.APIReader.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: secretName}, &secret); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: secretName}, &secret); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Secret doesn't exist, in theory this should not happen unless someone
 			// deleted the secret by manual, anyway we will ignore this
@@ -198,7 +195,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 		// Get the component
 		var comp appstudiov1alpha1.Component
-		if err := r.APIReader.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &comp); err != nil {
+		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &comp); err != nil {
 			if apierrors.IsNotFound(err) {
 				// Component has gone, we can't proceed
 				return ctrl.Result{}, nil
@@ -242,15 +239,12 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// We only react to Create events for Event in mintmaker namespace.
+	// Namespace filtering is handled by the manager's cache configuration.
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Event{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetNamespace() == MintMakerNamespaceName
-		}))).
+		For(&corev1.Event{}).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				if e.Object.GetNamespace() != MintMakerNamespaceName {
-					return false
-				}
 				evt, ok := e.Object.(*corev1.Event)
 				if !ok {
 					return false
