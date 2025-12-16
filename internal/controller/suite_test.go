@@ -26,8 +26,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,6 +37,7 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
 )
 
 const (
@@ -98,16 +101,37 @@ var _ = BeforeSuite(func() {
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
+		// Configure namespace-scoped cache to match production behavior.
+		// This ensures tests validate the actual filtering mechanism.
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&mmv1alpha1.DependencyUpdateCheck{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+				},
+				&corev1.Event{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+				},
+				&tektonv1.PipelineRun{}: {
+					Namespaces: map[string]cache.Config{
+						MintMakerNamespaceName: {},
+					},
+				},
+			},
+		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetAPIReader(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"))).SetupWithManager(k8sManager)
+	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"))).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&PipelineRunReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&EventReconciler{Client: k8sManager.GetClient(), APIReader: k8sManager.GetAPIReader(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
+	err = (&EventReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
