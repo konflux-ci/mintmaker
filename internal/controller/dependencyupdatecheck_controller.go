@@ -52,16 +52,14 @@ const InternalSecretLabelName = "appstudio.redhat.com/internal"
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
-	Client    client.Client
-	APIReader client.Reader
-	Scheme    *runtime.Scheme
+	Client client.Client
+	Scheme *runtime.Scheme
 }
 
-func NewDependencyUpdateCheckReconciler(client client.Client, apiReader client.Reader, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
+func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
-		Client:    client,
-		APIReader: apiReader,
-		Scheme:    scheme,
+		Client: client,
+		Scheme: scheme,
 	}
 }
 
@@ -96,7 +94,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 	componentNamespace := comp.GetNamespace()
 	serviceAccountName := "build-pipeline-" + comp.GetName()
 	serviceAccount := &corev1.ServiceAccount{}
-	if err := r.APIReader.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: serviceAccountName}, serviceAccount); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: serviceAccountName}, serviceAccount); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("service account not found in component namespace", "service-account", serviceAccountName)
 			return nil, nil
@@ -108,7 +106,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 	mergedAuths := make(map[string]interface{})
 	for _, secretRef := range serviceAccount.Secrets {
 		var secret corev1.Secret
-		if err := r.APIReader.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: secretRef.Name}, &secret); err != nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: componentNamespace, Name: secretRef.Name}, &secret); err != nil {
 			if errors.IsNotFound(err) {
 				log.Info("secret not found in component namespace", "secret", secretRef.Name)
 				continue
@@ -406,7 +404,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	ctx = ctrllog.IntoContext(ctx, log)
 
 	dependencyupdatecheck := &mmv1alpha1.DependencyUpdateCheck{}
-	err := r.APIReader.Get(ctx, req.NamespacedName, dependencyupdatecheck)
+	err := r.Client.Get(ctx, req.NamespacedName, dependencyupdatecheck)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -447,7 +445,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	} else {
 		allComponents := &appstudiov1alpha1.ComponentList{}
-		if err := r.APIReader.List(ctx, allComponents, &client.ListOptions{}); err != nil {
+		if err := r.Client.List(ctx, allComponents, &client.ListOptions{}); err != nil {
 			log.Error(err, "failed to list Components")
 			return ctrl.Result{}, err
 		}
