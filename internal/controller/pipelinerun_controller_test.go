@@ -23,8 +23,8 @@ import (
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	tekton "github.com/konflux-ci/mintmaker/internal/pkg/tekton"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
+	tekton "github.com/konflux-ci/mintmaker/internal/tekton"
 )
 
 func setupPipelineRun(name string, labels map[string]string, creationTimeOffset time.Duration) {

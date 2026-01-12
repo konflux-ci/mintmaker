@@ -43,9 +43,9 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/controller"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
+	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/metrics"
 	// +kubebuilder:scaffold:imports
 )
 

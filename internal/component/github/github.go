@@ -33,9 +33,9 @@ import (
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
-	"github.com/konflux-ci/mintmaker/internal/pkg/component/base"
-	"github.com/konflux-ci/mintmaker/internal/pkg/config"
-	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	"github.com/konflux-ci/mintmaker/internal/component/base"
+	"github.com/konflux-ci/mintmaker/internal/config"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 //TODO: doc about only supporting GitHub with the installed GitHub App

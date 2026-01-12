@@ -39,12 +39,12 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
-	"github.com/konflux-ci/mintmaker/internal/pkg/component"
-	"github.com/konflux-ci/mintmaker/internal/pkg/config"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/pkg/metrics"
-	"github.com/konflux-ci/mintmaker/internal/pkg/tekton"
-	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	"github.com/konflux-ci/mintmaker/internal/component"
+	"github.com/konflux-ci/mintmaker/internal/config"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
+	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/metrics"
+	"github.com/konflux-ci/mintmaker/internal/tekton"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 const InternalSecretLabelName = "appstudio.redhat.com/internal"

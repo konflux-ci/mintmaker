@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
 
-	bslices "github.com/konflux-ci/mintmaker/internal/pkg/slices"
+	bslices "github.com/konflux-ci/mintmaker/internal/slices"
 )
 
 var (

@@ -23,8 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	ghcomponent "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	ghcomponent "github.com/konflux-ci/mintmaker/internal/component/github"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
 var _ = Describe("DependencyUpdateCheck Controller", func() {
