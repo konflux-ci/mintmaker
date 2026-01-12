@@ -37,7 +37,7 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
 const (

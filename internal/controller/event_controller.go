@@ -31,7 +31,7 @@ import (
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
-	component "github.com/konflux-ci/mintmaker/internal/pkg/component"
+	component "github.com/konflux-ci/mintmaker/internal/component"
 )
 
 // EventReconciler reconciles a Event object

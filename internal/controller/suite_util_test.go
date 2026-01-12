@@ -29,7 +29,7 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
 var testPrivateKey = "-----BEGIN PRIVATE KEY-----\n" +

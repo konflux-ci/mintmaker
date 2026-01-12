@@ -23,8 +23,8 @@ import (
 	"unicode"
 
 	"github.com/hashicorp/go-multierror"
-	. "github.com/konflux-ci/mintmaker/internal/pkg/constant"
-	"github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

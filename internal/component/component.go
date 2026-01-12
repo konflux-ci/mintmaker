@@ -23,9 +23,9 @@ import (
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
-	github "github.com/konflux-ci/mintmaker/internal/pkg/component/github"
-	gitlab "github.com/konflux-ci/mintmaker/internal/pkg/component/gitlab"
-	utils "github.com/konflux-ci/mintmaker/internal/pkg/utils"
+	github "github.com/konflux-ci/mintmaker/internal/component/github"
+	gitlab "github.com/konflux-ci/mintmaker/internal/component/gitlab"
+	utils "github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 type GitComponent interface {

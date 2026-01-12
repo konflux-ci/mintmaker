@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/konflux-ci/mintmaker/internal/pkg/config"
+	"github.com/konflux-ci/mintmaker/internal/config"
 )
 
 // StaleAllowedCache refreshes data in the background while optionally
