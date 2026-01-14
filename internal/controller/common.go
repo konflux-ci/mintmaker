@@ -57,7 +57,7 @@ func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.Namespac
 			// Components specified -> add components with matching names
 			for _, filterComponent := range application.Components {
 				for _, component := range appMatchingComponents {
-					if filterComponent == mmv1alpha1.Component(component.Spec.ComponentName) {
+					if filterComponent == mmv1alpha1.Component(component.Name) {
 						components = append(components, component)
 						break
 					}

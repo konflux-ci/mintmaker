@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"strings"
 
-	"gitlab.com/gitlab-org/api/client-go"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +46,7 @@ type Repository struct {
 	Repository   string
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (*Component, error) {
-	giturl := comp.Spec.Source.GitSource.URL
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
 	if err != nil {
@@ -71,23 +70,22 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 			Host:        host,
 			GitURL:      giturl,
 			Repository:  repository,
-			Branch:      comp.Spec.Source.GitSource.Revision,
+			Versions:    versions,
 		},
 		client: client,
 		ctx:    ctx,
 	}, nil
 }
 
-func (c *Component) GetBranch() (string, error) {
-	if c.Branch != "" {
-		return c.Branch, nil
+func (c *Component) GetBranches() []string {
+	if len(c.Versions) == 0 {
+		branch, err := c.getDefaultBranch()
+		if err != nil {
+			return []string{}
+		}
+		return []string{branch}
 	}
-
-	branch, err := c.getDefaultBranch()
-	if err != nil {
-		return "main", nil
-	}
-	return branch, nil
+	return c.Versions
 }
 
 func (c *Component) lookupSecret() (*corev1.Secret, error) {
@@ -205,7 +203,7 @@ func (c *Component) getDefaultBranch() (string, error) {
 	return project.DefaultBranch, nil
 }
 
-func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBranch string) (string, error) {
 	baseConfig, err := c.GetRenovateBaseConfig(c.ctx, c.client)
 	if err != nil {
 		return "", err
@@ -226,12 +224,9 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 	baseConfig["gitAuthor"] = ""
 
 	// TODO: perhaps in the future let's validate all these values
-	branch, err := c.GetBranch()
-	if err != nil {
-		return "", err
-	}
+
 	repo := map[string]interface{}{
-		"baseBranchPatterns": []string{branch},
+		"baseBranchPatterns": []string{currentBranch},
 		"repository":         c.Repository,
 	}
 	baseConfig["repositories"] = []interface{}{repo}

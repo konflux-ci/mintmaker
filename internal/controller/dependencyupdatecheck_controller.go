@@ -157,7 +157,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, kiteSecretName string) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, currentBranch string, kiteSecretName string) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
 
@@ -211,7 +211,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 	resources = append(resources, renovateSecret)
 
-	renovateConfig, err := comp.GetRenovateConfig(renovateSecret)
+	renovateConfig, err := comp.GetRenovateConfig(renovateSecret, currentBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Creating the pipelineRun definition
-	branch, _ := comp.GetBranch()
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
@@ -266,7 +265,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
-			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(branch),
+			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(currentBranch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -502,44 +501,52 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 	timestamp := time.Now().UTC().Format("01021504") // MMDDhhmm, from Go's time formatting reference date "20060102150405"
 	for _, appstudioComponent := range componentList {
-		log = log.WithValues("component", appstudioComponent.Name,
+		compLog := log.WithValues("component", appstudioComponent.Name,
 			"componentNamespace", appstudioComponent.Namespace)
+		ctx = ctrllog.IntoContext(ctx, compLog)
 
 		comp, err := component.NewGitComponent(ctx, &appstudioComponent, r.Client)
 		if err != nil {
-			log.Error(err, "failed to handle component")
+			compLog.Error(err, "failed to handle component")
 			continue
 		}
 
-		// We need to create only one PipelineRun for a combination
-		// of repository+branch. We cannot use repository only,
-		// because the branch is used in Renovate's baseBranch config option.
-		branch, _ := comp.GetBranch()
-		host := comp.GetHost()
-		repository := comp.GetRepository()
-		key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
-
-		log = log.WithValues("repository", repository,
-			"branch", branch,
-			"gitHost", host)
-		ctx = ctrllog.IntoContext(ctx, log)
-
-		if slices.Contains(processedComponents, key) {
-			// PipelineRun has already been created for this repo-branch
-			log.Info("PipelineRun has been created for this component-key", "component-key", key)
+		branches := comp.GetBranches()
+		if len(branches) == 0 {
+			compLog.Info("no versions (branches) found for component", "component", appstudioComponent.Name)
 			continue
-		} else {
-			processedComponents = append(processedComponents, key)
 		}
 
-		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, kiteSecretName)
-		if err != nil {
-			log.Error(err, "failed to create PipelineRun")
-			mintmakermetrics.CountScheduledRunFailure()
-		} else {
-			log.Info("created PipelineRun", "pipelineRun", pipelinerun.Name)
-			mintmakermetrics.CountScheduledRunSuccess()
+		for _, branch := range branches {
+			// We need to create only one PipelineRun for a combination
+			// of repository+branch. We cannot use repository only,
+			// because the branch is used in Renovate's baseBranch config option.
+			host := comp.GetHost()
+			repository := comp.GetRepository()
+			key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
+
+			branchLog := compLog.WithValues("repository", repository,
+				"branch", branch,
+				"gitHost", host)
+			ctx = ctrllog.IntoContext(ctx, branchLog)
+
+			if slices.Contains(processedComponents, key) {
+				// PipelineRun has already been created for this repo-branch
+				branchLog.Info("PipelineRun has been created for this component-key", "component-key", key)
+				continue
+			} else {
+				processedComponents = append(processedComponents, key)
+			}
+
+			plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
+			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, branch, kiteSecretName)
+			if err != nil {
+				branchLog.Error(err, "failed to create PipelineRun")
+				mintmakermetrics.CountScheduledRunFailure()
+			} else {
+				branchLog.Info("created PipelineRun", "pipelineRun", pipelinerun.Name)
+				mintmakermetrics.CountScheduledRunSuccess()
+			}
 		}
 	}
 

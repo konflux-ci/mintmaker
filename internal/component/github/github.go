@@ -49,7 +49,7 @@ var (
 	ghUserID                    int64
 	ghAppSlug                   string
 	// vars for mocking purposes, during testing
-	GetRenovateConfigFn func(registrySecret *corev1.Secret) (string, error)
+	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
 	GetTokenFn          func() (string, error)
 )
 
@@ -87,12 +87,11 @@ func getAppIDAndKey(ctx context.Context, client client.Client) (int64, []byte, e
 	return ghAppID, ghAppPrivateKey, nil
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (*Component, error) {
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
 	appID, appPrivateKey, err := getAppIDAndKey(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
 	}
-	giturl := comp.Spec.Source.GitSource.URL
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
 	if err != nil {
@@ -116,7 +115,7 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 			Host:        host,
 			GitURL:      giturl,
 			Repository:  repository,
-			Branch:      comp.Spec.Source.GitSource.Revision,
+			Versions:    versions,
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,
@@ -125,16 +124,15 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	}, nil
 }
 
-func (c *Component) GetBranch() (string, error) {
-	if c.Branch != "" {
-		return c.Branch, nil
+func (c *Component) GetBranches() []string {
+	if len(c.Versions) == 0 {
+		branch, err := c.getDefaultBranch()
+		if err != nil {
+			return []string{}
+		}
+		return []string{branch}
 	}
-
-	branch, err := c.getDefaultBranch()
-	if err != nil {
-		return "main", nil
-	}
-	return branch, nil
+	return c.Versions
 }
 
 func (c *Component) getInstallationID() (int64, error) {
@@ -368,9 +366,9 @@ func (c *Component) getUserId(username string) (int64, error) {
 	return ghUserID, nil
 }
 
-func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBranch string) (string, error) {
 	if GetRenovateConfigFn != nil {
-		return GetRenovateConfigFn(registrySecret)
+		return GetRenovateConfigFn(registrySecret, currentBranch)
 	}
 
 	baseConfig, err := c.GetRenovateBaseConfig(c.ctx, c.client)
@@ -400,12 +398,9 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 	baseConfig["endpoint"] = c.GetAPIEndpoint()
 
 	// TODO: perhaps in the future let's validate all these values
-	branch, err := c.GetBranch()
-	if err != nil {
-		return "", err
-	}
+
 	repo := map[string]interface{}{
-		"baseBranchPatterns": []string{branch},
+		"baseBranchPatterns": []string{currentBranch},
 		"repository":         c.Repository,
 	}
 	baseConfig["repositories"] = []interface{}{repo}
