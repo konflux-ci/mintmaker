@@ -252,32 +252,81 @@ func deleteConfigMap(resourceKey types.NamespacedName) {
 	}, timeout, interval).Should(BeTrue())
 }
 
-func createComponent(resourceKey types.NamespacedName, application, gitURL, gitRevision, gitSourceContext string) {
-	component := &appstudiov1alpha1.Component{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "appstudio.redhat.com/v1alpha1",
-			Kind:       "Component",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resourceKey.Name,
-			Namespace: resourceKey.Namespace,
-		},
-		Spec: appstudiov1alpha1.ComponentSpec{
-			ComponentName: resourceKey.Name,
-			Application:   application,
-			Source: appstudiov1alpha1.ComponentSource{
-				ComponentSourceUnion: appstudiov1alpha1.ComponentSourceUnion{
-					GitSource: &appstudiov1alpha1.GitSource{
-						URL:      gitURL,
-						Revision: gitRevision,
-						Context:  gitSourceContext,
+func createComponent(resourceKey types.NamespacedName, crdVersion, application, gitURL, gitRevision, gitSourceContext string) {
+	if crdVersion == "v1" {
+		component := &appstudiov1alpha1.Component{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "appstudio.redhat.com/v1alpha1",
+				Kind:       "Component",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceKey.Name,
+				Namespace: resourceKey.Namespace,
+				Annotations: map[string]string{
+					"appstudio.openshift.io/component-model": crdVersion,
+				},
+			},
+			Spec: appstudiov1alpha1.ComponentSpec{
+				ComponentName: resourceKey.Name,
+				Application:   application,
+				Source: appstudiov1alpha1.ComponentSource{
+					ComponentSourceUnion: appstudiov1alpha1.ComponentSourceUnion{
+						GitSource: &appstudiov1alpha1.GitSource{
+							URL:      gitURL,
+							Revision: gitRevision,
+							Context:  gitSourceContext,
+						},
 					},
 				},
 			},
-		},
+		}
+		Expect(k8sClient.Create(ctx, component)).Should(Succeed())
+		getComponent(resourceKey)
+	} else {
+		component := &appstudiov1alpha1.Component{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "appstudio.redhat.com/v1alpha1",
+				Kind:       "Component",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceKey.Name,
+				Namespace: resourceKey.Namespace,
+				Annotations: map[string]string{
+					"appstudio.openshift.io/component-model": crdVersion,
+				},
+			},
+			Spec: appstudiov1alpha1.ComponentSpec{
+				Source: appstudiov1alpha1.ComponentSource{
+					ComponentSourceUnion: appstudiov1alpha1.ComponentSourceUnion{
+						GitURL: gitURL,
+						Versions: []appstudiov1alpha1.ComponentVersion{
+							{
+								Revision: gitRevision,
+							},
+							{
+								Revision: gitRevision + "-v1",
+							},
+							{
+								Revision: gitRevision + "-v2",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, component)).Should(Succeed())
+
+		createdComponent := getComponent(resourceKey)
+		createdComponent.Status = appstudiov1alpha1.ComponentStatus{
+			Versions: []appstudiov1alpha1.ComponentVersionStatus{
+				{Revision: gitRevision, OnboardingStatus: "succeeded"},
+				{Revision: gitRevision + "-v1", OnboardingStatus: "succeeded"},
+				{Revision: gitRevision + "-v2", OnboardingStatus: "succeeded"},
+			},
+		}
+		Expect(k8sClient.Status().Update(ctx, createdComponent)).Should(Succeed())
+		getComponent(resourceKey)
 	}
-	Expect(k8sClient.Create(ctx, component)).Should(Succeed())
-	getComponent(resourceKey)
 }
 
 func getComponent(resourceKey types.NamespacedName) *appstudiov1alpha1.Component {
