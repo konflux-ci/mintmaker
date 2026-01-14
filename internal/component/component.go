@@ -37,18 +37,22 @@ type GitComponent interface {
 	GetGitURL() string
 	GetRepository() string
 	GetToken() (string, error)
-	GetBranch() (string, error)
+	GetCurrentBranch() string
+	GetBranches() []string
 	GetAPIEndpoint() string
 	GetRenovateConfig(*corev1.Secret) (string, error)
 	GetRPMActivationKey(context.Context, client.Client) (string, string, error)
+	SetCurrentBranch(string)
 }
 
 func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (GitComponent, error) {
 	// First check if source url exists and is properly defined
-	if comp.Spec.Source.GitSource == nil || comp.Spec.Source.GitSource.URL == "" {
-		return nil, fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
+	gitUrl, err := utils.GetGitURL(comp)
+	if err != nil {
+		return nil, err
 	}
-	platform, err := utils.GetGitPlatform(comp.Spec.Source.GitSource.URL)
+
+	platform, err := utils.GetGitPlatform(gitUrl)
 	if err != nil {
 		return nil, err
 	}
