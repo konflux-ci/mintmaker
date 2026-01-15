@@ -91,7 +91,10 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
 	}
-	giturl := comp.Spec.Source.GitSource.URL
+	giturl, err := utils.GetGitURL(comp)
+	if err != nil {
+		return nil, err
+	}
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
 	if err != nil {
@@ -106,16 +109,24 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 		return nil, err
 	}
 
+	// read annotation to differentiate between old model (v1) and new model (v2)
+	crdVersion := "v1"
+	if comp.Annotations["appstudio.openshift.io/component-model"] != "" {
+		crdVersion = comp.Annotations["appstudio.openshift.io/component-model"]
+	}
+
 	return &Component{
 		BaseComponent: base.BaseComponent{
-			Name:        comp.Name,
-			Namespace:   comp.Namespace,
-			Application: comp.Spec.Application,
-			Platform:    platform,
-			Host:        host,
-			GitURL:      giturl,
-			Repository:  repository,
-			Branch:      comp.Spec.Source.GitSource.Revision,
+			Name:          comp.Name,
+			Namespace:     comp.Namespace,
+			Application:   comp.Spec.Application,
+			Platform:      platform,
+			Host:          host,
+			GitURL:        giturl,
+			Repository:    repository,
+			CurrentBranch: "",
+			Versions:      utils.GetVersions(comp),
+			CRDVersion:    crdVersion,
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,
@@ -124,16 +135,23 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	}, nil
 }
 
-func (c *Component) GetBranch() (string, error) {
-	if c.Branch != "" {
-		return c.Branch, nil
-	}
+func (c *Component) GetCurrentBranch() string {
+	return c.CurrentBranch
+}
 
-	branch, err := c.getDefaultBranch()
-	if err != nil {
-		return "main", nil
+func (c *Component) SetCurrentBranch(branch string) {
+	c.CurrentBranch = branch
+}
+
+func (c *Component) GetBranches() []string {
+	if len(c.Versions) == 0 && c.CRDVersion == "v1" {
+		branch, err := c.getDefaultBranch()
+		if err != nil {
+			return []string{}
+		}
+		return []string{branch}
 	}
-	return branch, nil
+	return c.Versions
 }
 
 func (c *Component) getInstallationID() (int64, error) {
@@ -394,12 +412,9 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 	baseConfig["endpoint"] = c.GetAPIEndpoint()
 
 	// TODO: perhaps in the future let's validate all these values
-	branch, err := c.GetBranch()
-	if err != nil {
-		return "", err
-	}
+
 	repo := map[string]interface{}{
-		"baseBranches": []string{branch},
+		"baseBranches": []string{c.GetCurrentBranch()},
 		"repository":   c.Repository,
 	}
 	baseConfig["repositories"] = []interface{}{repo}
