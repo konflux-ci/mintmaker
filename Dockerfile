@@ -3,7 +3,6 @@ FROM registry.access.redhat.com/ubi9/go-toolset:latest@sha256:38d909b4f0b5244bc6
 
 ARG TARGETOS
 ARG TARGETARCH
-ENV GOTOOLCHAIN=auto
 
 # Copy the Go Modules manifests
 COPY go.mod go.mod
