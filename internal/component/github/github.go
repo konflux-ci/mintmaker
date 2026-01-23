@@ -47,6 +47,7 @@ var (
 	ghAppID                     int64
 	ghAppPrivateKey             []byte
 	ghUserID                    int64
+	ghAppSlug                   string
 	// vars for mocking purposes, during testing
 	GetRenovateConfigFn func(registrySecret *corev1.Secret) (string, error)
 	GetTokenFn          func() (string, error)
@@ -328,6 +329,10 @@ func (c *Component) GetAPIEndpoint() string {
 }
 
 func (c *Component) getAppSlug() (string, error) {
+	if ghAppSlug != "" {
+		return ghAppSlug, nil
+	}
+
 	appID, appPrivateKey, err := getAppIDAndKey(c.ctx, c.client)
 	if err != nil {
 		return "", err
@@ -342,8 +347,9 @@ func (c *Component) getAppSlug() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to load GitHub app metadata, %w", err)
 	}
-	slug := app.GetSlug()
-	return slug, nil
+
+	ghAppSlug = app.GetSlug()
+	return ghAppSlug, nil
 }
 
 func (c *Component) getUserId(username string) (int64, error) {
