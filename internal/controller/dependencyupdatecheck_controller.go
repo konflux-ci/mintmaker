@@ -333,9 +333,38 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 		builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
-	// Add Kite integration if enabled
+	// Add Kite integration if enabled AND token is available (needed for API requests)
 	if cfg := config.Get(); cfg.Kite.Enabled {
-		builder.WithKiteIntegration(cfg.Kite.APIURL)
+		tokenSecretName := "mintmaker-controller-manager-token"
+		tokenSecret := &corev1.Secret{}
+		err := r.Client.Get(ctx, types.NamespacedName{
+			Namespace: MintMakerNamespaceName,
+			Name:      tokenSecretName,
+		}, tokenSecret)
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Kite integration enabled but token secret not found - skipping Kite integration",
+					"secret", tokenSecretName,
+					"namespace", MintMakerNamespaceName)
+			} else {
+				log.Error(err, "failed to check for Kite token secret - skipping Kite integration")
+			}
+		} else {
+			builder.WithKiteIntegration(cfg.Kite.APIURL)
+
+			tokenSecretItems := []corev1.KeyToPath{
+				{
+					Key:  "token",
+					Path: "token",
+				},
+			}
+			tokenSecretOpts := tekton.NewMountOptions().
+				WithTaskName("build").
+				WithStepNames([]string{"log-analyzer"}).
+				WithReadOnly(true)
+			builder.WithSecret(tokenSecretName, "/var/run/secrets/kite", tokenSecretItems, tokenSecretOpts)
+		}
 	}
 
 	pipelineRun, err := builder.Build()
