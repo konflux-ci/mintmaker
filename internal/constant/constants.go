@@ -21,6 +21,8 @@ const (
 	MintMakerProcessedAnnotationName = "mintmaker.appstudio.redhat.com/processed"
 	// Mintmaker can be disabled by disabled annotation in component
 	MintMakerDisabledAnnotationName = "mintmaker.appstudio.redhat.com/disabled"
+	// Label for the Kite token secret, used to find the secret in the namespace
+	KiteTokenSecretLabel = "mintmaker.appstudio.redhat.com/kite-token"
 
 	RenovateImageEnvName    = "RENOVATE_IMAGE"
 	DefaultRenovateImageURL = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
