@@ -405,8 +405,8 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 		return "", err
 	}
 	repo := map[string]interface{}{
-		"baseBranches": []string{branch},
-		"repository":   c.Repository,
+		"baseBranchPatterns": []string{branch},
+		"repository":         c.Repository,
 	}
 	baseConfig["repositories"] = []interface{}{repo}
 	updatedConfig, err := json.MarshalIndent(baseConfig, "", "  ")
