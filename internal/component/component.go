@@ -37,17 +37,15 @@ type GitComponent interface {
 	GetGitURL() string
 	GetRepository() string
 	GetToken() (string, error)
-	GetCurrentBranch() string
 	GetBranches() []string
 	GetAPIEndpoint() string
-	GetRenovateConfig(*corev1.Secret) (string, error)
+	GetRenovateConfig(*corev1.Secret, string) (string, error)
 	GetRPMActivationKey(context.Context, client.Client) (string, string, error)
-	SetCurrentBranch(string)
 }
 
 func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (GitComponent, error) {
 	// First check if source url exists and is properly defined
-	gitUrl, err := utils.GetGitURL(comp)
+	gitUrl, err := GetGitURL(comp)
 	if err != nil {
 		return nil, err
 	}
@@ -59,13 +57,13 @@ func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, cli
 
 	switch platform {
 	case "github":
-		c, err := github.NewComponent(ctx, comp, client)
+		c, err := github.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp))
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
 		return c, nil
 	case "gitlab":
-		c, err := gitlab.NewComponent(ctx, comp, client)
+		c, err := gitlab.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp))
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
@@ -73,4 +71,31 @@ func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, cli
 	default:
 		return nil, fmt.Errorf("unsupported platform: %s", platform)
 	}
+}
+
+// GetGitURL returns the git URL for the component
+// It supports both the old and new component models
+func GetGitURL(comp *appstudiov1alpha1.Component) (string, error) {
+	if comp.Spec.Source.GitSource != nil && comp.Spec.Source.GitSource.URL != "" {
+		return comp.Spec.Source.GitSource.URL, nil
+	}
+
+	if comp.Spec.Source.GitURL != "" {
+		return comp.Spec.Source.GitURL, nil
+	}
+
+	return "", fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
+}
+
+func GetVersions(comp *appstudiov1alpha1.Component) []string {
+	if comp.Spec.Source.GitSource != nil && comp.Spec.Source.GitSource.Revision != "" {
+		return []string{comp.Spec.Source.GitSource.Revision}
+	}
+
+	versions := make([]string, 0, len(comp.Spec.Source.Versions))
+	for _, v := range comp.Spec.Source.Versions {
+		versions = append(versions, v.Revision)
+	}
+
+	return versions
 }

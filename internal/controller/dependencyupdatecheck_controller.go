@@ -157,7 +157,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, currentBranch string) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
 
@@ -211,7 +211,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 	resources = append(resources, renovateSecret)
 
-	renovateConfig, err := comp.GetRenovateConfig(renovateSecret)
+	renovateConfig, err := comp.GetRenovateConfig(renovateSecret, currentBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,6 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Creating the pipelineRun definition
-	branch := comp.GetCurrentBranch()
 	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
@@ -266,7 +265,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
-			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(branch),
+			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(currentBranch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -508,10 +507,8 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 				processedComponents = append(processedComponents, key)
 			}
 
-			comp.SetCurrentBranch(branch)
-
 			plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp)
+			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, branch)
 			if err != nil {
 				branchLog.Error(err, "failed to create PipelineRun")
 				mintmakermetrics.CountScheduledRunFailure()

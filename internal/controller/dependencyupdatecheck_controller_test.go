@@ -30,7 +30,7 @@ import (
 var _ = Describe("DependencyUpdateCheck Controller", func() {
 
 	var (
-		origGetRenovateConfig func(registrySecret *corev1.Secret) (string, error)
+		origGetRenovateConfig func(registrySecret *corev1.Secret, currentBranch string) (string, error)
 		origGetTokenFn        func() (string, error)
 	)
 
@@ -74,7 +74,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				createConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"}, configMapData)
 
 				origGetRenovateConfig = ghcomponent.GetRenovateConfigFn
-				ghcomponent.GetRenovateConfigFn = func(registrySecret *corev1.Secret) (string, error) {
+				ghcomponent.GetRenovateConfigFn = func(registrySecret *corev1.Secret, currentBranch string) (string, error) {
 					return "mock config", nil
 				}
 

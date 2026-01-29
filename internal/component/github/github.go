@@ -49,7 +49,7 @@ var (
 	ghUserID                    int64
 	ghAppSlug                   string
 	// vars for mocking purposes, during testing
-	GetRenovateConfigFn func(registrySecret *corev1.Secret) (string, error)
+	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
 	GetTokenFn          func() (string, error)
 )
 
@@ -87,14 +87,10 @@ func getAppIDAndKey(ctx context.Context, client client.Client) (int64, []byte, e
 	return ghAppID, ghAppPrivateKey, nil
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (*Component, error) {
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
 	appID, appPrivateKey, err := getAppIDAndKey(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
-	}
-	giturl, err := utils.GetGitURL(comp)
-	if err != nil {
-		return nil, err
 	}
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
@@ -110,24 +106,16 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 		return nil, err
 	}
 
-	// read annotation to differentiate between old model (v1) and new model (v2)
-	crdVersion := "v1"
-	if comp.Annotations["appstudio.openshift.io/component-model"] != "" {
-		crdVersion = comp.Annotations["appstudio.openshift.io/component-model"]
-	}
-
 	return &Component{
 		BaseComponent: base.BaseComponent{
-			Name:          comp.Name,
-			Namespace:     comp.Namespace,
-			Application:   comp.Spec.Application,
-			Platform:      platform,
-			Host:          host,
-			GitURL:        giturl,
-			Repository:    repository,
-			CurrentBranch: "",
-			Versions:      utils.GetVersions(comp),
-			CRDVersion:    crdVersion,
+			Name:        comp.Name,
+			Namespace:   comp.Namespace,
+			Application: comp.Spec.Application,
+			Platform:    platform,
+			Host:        host,
+			GitURL:      giturl,
+			Repository:  repository,
+			Versions:    versions,
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,
@@ -136,16 +124,8 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	}, nil
 }
 
-func (c *Component) GetCurrentBranch() string {
-	return c.CurrentBranch
-}
-
-func (c *Component) SetCurrentBranch(branch string) {
-	c.CurrentBranch = branch
-}
-
 func (c *Component) GetBranches() []string {
-	if len(c.Versions) == 0 && c.CRDVersion == "v1" {
+	if len(c.Versions) == 0 {
 		branch, err := c.getDefaultBranch()
 		if err != nil {
 			return []string{}
@@ -386,9 +366,9 @@ func (c *Component) getUserId(username string) (int64, error) {
 	return ghUserID, nil
 }
 
-func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, error) {
+func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBranch string) (string, error) {
 	if GetRenovateConfigFn != nil {
-		return GetRenovateConfigFn(registrySecret)
+		return GetRenovateConfigFn(registrySecret, currentBranch)
 	}
 
 	baseConfig, err := c.GetRenovateBaseConfig(c.ctx, c.client)
@@ -420,7 +400,7 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret) (string, er
 	// TODO: perhaps in the future let's validate all these values
 
 	repo := map[string]interface{}{
-		"baseBranchPatterns": []string{branch},
+		"baseBranchPatterns": []string{currentBranch},
 		"repository":         c.Repository,
 	}
 	baseConfig["repositories"] = []interface{}{repo}
