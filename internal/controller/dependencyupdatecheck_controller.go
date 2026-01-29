@@ -157,7 +157,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, kiteTokenFound bool) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, tokenSecretName string) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
 
@@ -334,8 +334,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Add Kite integration if enabled AND token is available
-	if kiteTokenFound {
-		tokenSecretName := "mintmaker-controller-manager-token"
+	if tokenSecretName != "" {
 		builder.WithKiteIntegration(config.Get().Kite.APIURL)
 
 		tokenSecretItems := []corev1.KeyToPath{
@@ -480,19 +479,21 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	// Check for token Secret if Kite integration is enabled (token needed for Kite API requests)
-	// kiteTokenFound is true only if Kite integration is enabled and the token secret is found
-	kiteTokenFound := false
+	// tokenSecretName is only set if Kite integration is enabled and the token secret is found
+	tokenSecretName := ""
 	if cfg := config.Get(); cfg.Kite.Enabled {
-		tokenSecretName := "mintmaker-controller-manager-token"
-		tokenSecret := &corev1.Secret{}
-		err := r.Client.Get(ctx, types.NamespacedName{
-			Namespace: MintMakerNamespaceName,
-			Name:      tokenSecretName,
-		}, tokenSecret)
+		secretList := &corev1.SecretList{}
+		err := r.Client.List(ctx, secretList,
+			client.InNamespace(MintMakerNamespaceName),
+			client.MatchingLabels{KiteTokenSecretLabel: "true"},
+		)
 		if err != nil {
-			log.Error(err, "Kite token secret lookup failed- skipping Kite integration")
+			log.Error(err, "Kite token secret lookup failed - skipping Kite integration")
+		} else if len(secretList.Items) == 0 {
+			log.Info("Kite token secret not found - skipping Kite integration")
 		} else {
-			kiteTokenFound = true
+			tokenSecretName = secretList.Items[0].Name
+			log.Info("Kite token secret found - using it", "secretName", tokenSecretName)
 		}
 	}
 
@@ -532,7 +533,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, kiteTokenFound)
+		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, tokenSecretName)
 		if err != nil {
 			log.Error(err, "failed to create PipelineRun")
 			mintmakermetrics.CountScheduledRunFailure()
