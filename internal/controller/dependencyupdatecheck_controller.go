@@ -157,7 +157,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, kiteSecretName string) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
 
@@ -333,9 +333,21 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 		builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
-	// Add Kite integration if enabled
-	if cfg := config.Get(); cfg.Kite.Enabled {
-		builder.WithKiteIntegration(cfg.Kite.APIURL)
+	// Add Kite integration if enabled AND token is available
+	if kiteSecretName != "" {
+		builder.WithKiteIntegration(config.Get().Kite.APIURL)
+
+		tokenSecretItems := []corev1.KeyToPath{
+			{
+				Key:  "token",
+				Path: "token",
+			},
+		}
+		tokenSecretOpts := tekton.NewMountOptions().
+			WithTaskName("build").
+			WithStepNames([]string{"log-analyzer"}).
+			WithReadOnly(true)
+		builder.WithSecret(kiteSecretName, "/var/run/secrets/kite", tokenSecretItems, tokenSecretOpts)
 	}
 
 	pipelineRun, err := builder.Build()
@@ -466,6 +478,25 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Check for token Secret if Kite integration is enabled (token needed for Kite API requests)
+	// kiteSecretName is only set if Kite integration is enabled and the token secret is found
+	kiteSecretName := ""
+	if cfg := config.Get(); cfg.Kite.Enabled {
+		secretList := &corev1.SecretList{}
+		err := r.Client.List(ctx, secretList,
+			client.InNamespace(MintMakerNamespaceName),
+			client.MatchingLabels{KiteTokenSecretLabel: "true"},
+		)
+		if err != nil {
+			log.Error(err, "Kite token secret lookup failed - skipping Kite integration")
+		} else if len(secretList.Items) == 0 {
+			log.Info("Kite token secret not found - skipping Kite integration")
+		} else {
+			kiteSecretName = secretList.Items[0].Name
+			log.Info("Kite token secret found - using it", "secretName", kiteSecretName)
+		}
+	}
+
 	// Track components for which we already created a PipelineRun
 	processedComponents := make([]string, 0)
 
@@ -502,7 +533,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		}
 
 		plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp)
+		pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, kiteSecretName)
 		if err != nil {
 			log.Error(err, "failed to create PipelineRun")
 			mintmakermetrics.CountScheduledRunFailure()

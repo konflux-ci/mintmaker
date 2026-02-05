@@ -555,6 +555,10 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 						Name:  "LOG_FILE",
 						Value: "/workspace/shared-data/renovate-logs.json",
 					},
+					{
+						Name:  "KITE_AUTH_TOKEN_FILE",
+						Value: "/var/run/secrets/kite/token",
+					},
 				},
 			}
 			*steps = append(*steps, logAnalyzerStep)
