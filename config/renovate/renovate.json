@@ -26,6 +26,7 @@
   "additionalBranchPrefix": "{{baseBranch}}/",
   "branchPrefix": "konflux/mintmaker/",
   "enabledManagers": [
+    "github-actions",
     "tekton",
     "dockerfile",
     "rpm-lockfile",
