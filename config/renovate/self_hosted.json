@@ -8,7 +8,7 @@
     "DNF_VAR_SSL_CLIENT_CERT": "/workspace/shared-data/rpm-certs/cert.pem",
     "DNF_VAR_SSL_CLIENT_KEY": "/workspace/shared-data/rpm-certs/key.pem"
   },
-  "repositoryCache": "disabled",
+  "repositoryCache": "enabled",
   "repositoryCacheType": "redis://redis:6379/1",
   "cacheTtlOverride": {
     "changelog-*": 240,
