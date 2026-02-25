@@ -51,6 +51,7 @@ var (
 	// vars for mocking purposes, during testing
 	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
 	GetTokenFn          func() (string, error)
+	GetBranchesFn       func() ([]string, error)
 )
 
 type AppInstallation struct {
@@ -87,7 +88,7 @@ func getAppIDAndKey(ctx context.Context, client client.Client) (int64, []byte, e
 	return ghAppID, ghAppPrivateKey, nil
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string, oldCRDVersion bool) (*Component, error) {
 	appID, appPrivateKey, err := getAppIDAndKey(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
@@ -108,14 +109,15 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 
 	return &Component{
 		BaseComponent: base.BaseComponent{
-			Name:        comp.Name,
-			Namespace:   comp.Namespace,
-			Application: comp.Spec.Application,
-			Platform:    platform,
-			Host:        host,
-			GitURL:      giturl,
-			Repository:  repository,
-			Versions:    versions,
+			Name:          comp.Name,
+			Namespace:     comp.Namespace,
+			Application:   comp.Spec.Application,
+			Platform:      platform,
+			Host:          host,
+			GitURL:        giturl,
+			Repository:    repository,
+			Versions:      versions,
+			OldCRDVersion: oldCRDVersion,
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,
@@ -124,15 +126,41 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	}, nil
 }
 
-func (c *Component) GetBranches() []string {
-	if len(c.Versions) == 0 {
-		branch, err := c.getDefaultBranch()
-		if err != nil {
-			return []string{}
-		}
-		return []string{branch}
+func (c *Component) GetBranches() ([]string, error) {
+	if GetBranchesFn != nil {
+		return GetBranchesFn()
 	}
-	return c.Versions
+
+	if len(c.Versions) == 0 && c.OldCRDVersion {
+		defaultBranch, err := c.getDefaultBranch()
+		if err != nil {
+			return []string{}, fmt.Errorf("component does not have a branch specified and failed to get default branch: %w", err)
+		}
+		return []string{defaultBranch}, nil
+	}
+
+	var branches []string
+	client, err := c.getClient()
+	if err != nil {
+		return []string{}, fmt.Errorf("GetBranches: failed to get GitHub client: %w", err)
+	}
+	owner, repo, err := c.getOwnerAndRepo()
+	if err != nil {
+		return []string{}, fmt.Errorf("GetBranches: failed to get owner and repository: %w", err)
+	}
+
+	for _, version := range c.Versions {
+		_, _, err := client.Repositories.GetBranch(context.Background(), owner, repo, version, 5)
+		if err == nil {
+			branches = append(branches, version)
+		}
+	}
+
+	if len(branches) == 0 {
+		return []string{}, fmt.Errorf("no versions found or all versions are tags (not branches)")
+	}
+
+	return branches, nil
 }
 
 func (c *Component) getInstallationID() (int64, error) {
@@ -297,21 +325,16 @@ func (c *Component) fetchAppInstallations() ([]AppInstallation, error) {
 }
 
 func (c *Component) getDefaultBranch() (string, error) {
-	token, err := c.GetToken()
+
+	client, err := c.getClient()
 	if err != nil {
-		return "", fmt.Errorf("failed to get GitHub token: %w", err)
+		return "", fmt.Errorf("failed to get GitHub client: %w", err)
 	}
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(context.Background(), ts)
-	client := github.NewClient(tc)
-	parts := strings.Split(c.Repository, "/")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid repository format: %s", c.Repository)
+	owner, repo, err := c.getOwnerAndRepo()
+	if err != nil {
+		return "", fmt.Errorf("failed to get owner and repository: %w", err)
 	}
-	owner := parts[0]
-	repo := parts[1]
+
 	repositoryInfo, _, err := client.Repositories.Get(context.Background(), owner, repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to get repository information: %w", err)
@@ -319,6 +342,7 @@ func (c *Component) getDefaultBranch() (string, error) {
 	if repositoryInfo.DefaultBranch == nil {
 		return "", fmt.Errorf("repository default branch is nil")
 	}
+
 	return *repositoryInfo.DefaultBranch, nil
 }
 
@@ -409,4 +433,27 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBran
 		return "", err
 	}
 	return string(updatedConfig), nil
+}
+
+func (c *Component) getClient() (*github.Client, error) {
+	token, err := c.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GitHub token: %w", err)
+	}
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(context.Background(), ts)
+	client := github.NewClient(tc)
+
+	return client, nil
+}
+
+func (c *Component) getOwnerAndRepo() (string, string, error) {
+	parts := strings.Split(c.Repository, "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid repository format: %s", c.Repository)
+	}
+
+	return parts[0], parts[1], nil
 }
