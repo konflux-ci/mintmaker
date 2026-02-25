@@ -49,8 +49,9 @@ var (
 	ghUserID                    int64
 	ghAppSlug                   string
 	// vars for mocking purposes, during testing
-	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
-	GetTokenFn          func() (string, error)
+	GetRenovateConfigFn       func(registrySecret *corev1.Secret, currentBranch string) (string, error)
+	GetTokenFn                func() (string, error)
+	GetCompVersionsBranchesFn func() ([]string, error)
 )
 
 type AppInstallation struct {
@@ -108,14 +109,16 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 
 	return &Component{
 		BaseComponent: base.BaseComponent{
-			Name:        comp.Name,
-			Namespace:   comp.Namespace,
-			Application: comp.Spec.Application,
-			Platform:    platform,
-			Host:        host,
-			GitURL:      giturl,
-			Repository:  repository,
-			Versions:    versions,
+			Name:              comp.Name,
+			Namespace:         comp.Namespace,
+			Application:       comp.Spec.Application,
+			Platform:          platform,
+			Host:              host,
+			GitURL:            giturl,
+			Repository:        repository,
+			RepoAllBranches:   nil,
+			RepoDefaultBranch: "",
+			Versions:          versions,
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,
@@ -124,15 +127,46 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 	}, nil
 }
 
-func (c *Component) GetBranches() []string {
-	if len(c.Versions) == 0 {
-		branch, err := c.getDefaultBranch()
-		if err != nil {
-			return []string{}
-		}
-		return []string{branch}
+func (c *Component) GetCompVersionsBranches() ([]string, error) {
+	if GetCompVersionsBranchesFn != nil {
+		return GetCompVersionsBranchesFn()
 	}
-	return c.Versions
+
+	var branches []string
+	if len(c.Versions) != 0 {
+		token, err := c.GetToken()
+		if err != nil {
+			return nil, fmt.Errorf("GetCompVersionsBranches: failed to get GitHub token: %w", err)
+		}
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		)
+		tc := oauth2.NewClient(context.Background(), ts)
+		client := github.NewClient(tc)
+		parts := strings.Split(c.Repository, "/")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("GetCompVersionsBranches: invalid repository format: %s", c.Repository)
+		}
+		owner := parts[0]
+		repo := parts[1]
+
+		for _, version := range c.Versions {
+			_, _, err := client.Repositories.GetBranch(context.Background(), owner, repo, version, 5)
+			if err == nil {
+				branches = append(branches, version)
+			}
+		}
+	}
+
+	if len(branches) == 0 {
+		defaultBranch, err := c.getDefaultBranch()
+		if err != nil {
+			return []string{}, fmt.Errorf("component does not have a branch specified and failed to get default branch: %w", err)
+		}
+		return []string{defaultBranch}, nil
+	}
+
+	return branches, nil
 }
 
 func (c *Component) getInstallationID() (int64, error) {
@@ -319,6 +353,7 @@ func (c *Component) getDefaultBranch() (string, error) {
 	if repositoryInfo.DefaultBranch == nil {
 		return "", fmt.Errorf("repository default branch is nil")
 	}
+
 	return *repositoryInfo.DefaultBranch, nil
 }
 

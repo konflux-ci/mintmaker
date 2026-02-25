@@ -30,8 +30,9 @@ import (
 var _ = Describe("DependencyUpdateCheck Controller", func() {
 
 	var (
-		origGetRenovateConfig func(registrySecret *corev1.Secret, currentBranch string) (string, error)
-		origGetTokenFn        func() (string, error)
+		origGetRenovateConfig       func(registrySecret *corev1.Secret, currentBranch string) (string, error)
+		origGetTokenFn              func() (string, error)
+		origGetCompVersionsBranches func() ([]string, error)
 	)
 
 	// Test both component model versions: v1 (old model with GitSource) and v2 (new model with GitURL)
@@ -83,6 +84,17 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 					return "tokenstring", nil
 				}
 
+				origGetCompVersionsBranches = ghcomponent.GetCompVersionsBranchesFn
+				if crdVersion == "v1" {
+					ghcomponent.GetCompVersionsBranchesFn = func() ([]string, error) {
+						return []string{"gitrevision"}, nil
+					}
+				} else {
+					ghcomponent.GetCompVersionsBranchesFn = func() ([]string, error) {
+						return []string{"gitrevision", "gitrevision-v1", "gitrevision-v2"}, nil
+					}
+				}
+
 				Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(0))
 			})
 
@@ -93,11 +105,24 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				deleteConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"})
 				ghcomponent.GetRenovateConfigFn = origGetRenovateConfig
 				ghcomponent.GetTokenFn = origGetTokenFn
+				ghcomponent.GetCompVersionsBranchesFn = origGetCompVersionsBranches
 			})
 
 			It("should create pipelineruns for each branch/version", func() {
 				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
 				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			It("should create pipelineruns only for versions that are branches (filter out tags)", func() {
+				if crdVersion != "v2" {
+					return
+				}
+				ghcomponent.GetCompVersionsBranchesFn = func() ([]string, error) {
+					return []string{"gitrevision", "gitrevision-v1"}, nil
+				}
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(2))
 				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
 			})
 

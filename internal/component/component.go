@@ -37,7 +37,7 @@ type GitComponent interface {
 	GetGitURL() string
 	GetRepository() string
 	GetToken() (string, error)
-	GetBranches() []string
+	GetCompVersionsBranches() ([]string, error)
 	GetAPIEndpoint() string
 	GetRenovateConfig(*corev1.Secret, string) (string, error)
 	GetRPMActivationKey(context.Context, client.Client) (string, string, error)
