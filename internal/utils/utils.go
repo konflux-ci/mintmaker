@@ -21,7 +21,7 @@ import (
 )
 
 func GetGitPlatform(giturl string) (string, error) {
-	allowedGitPlatforms := []string{"github", "gitlab"}
+	allowedGitPlatforms := []string{"github", "gitlab", "forge"}
 	host, err := GetGitHost(giturl)
 	if err != nil {
 		return "", err
@@ -30,7 +30,11 @@ func GetGitPlatform(giturl string) (string, error) {
 	var gitPlatform string
 	for _, platform := range allowedGitPlatforms {
 		if strings.Contains(host, platform) {
-			gitPlatform = platform
+			if platform == "forge" {
+				gitPlatform = "forgejo"
+			} else {
+				gitPlatform = platform
+			}
 			break
 		}
 	}
