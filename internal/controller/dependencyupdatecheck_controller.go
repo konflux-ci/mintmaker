@@ -511,25 +511,24 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			continue
 		}
 
-		branches := comp.GetBranches()
-		if len(branches) == 0 {
-			compLog.Info("no versions (branches) found for component", "component", appstudioComponent.Name)
+		versions, err := comp.GetCompVersionsBranches()
+		if err != nil {
+			compLog.Info("couldn't find versions which are branches for component", "component", appstudioComponent.Name, "err", err)
 			continue
 		}
 
-		for _, branch := range branches {
+		host := comp.GetHost()
+		repository := comp.GetRepository()
+		for _, versionName := range versions {
 			// We need to create only one PipelineRun for a combination
 			// of repository+branch. We cannot use repository only,
 			// because the branch is used in Renovate's baseBranch config option.
-			host := comp.GetHost()
-			repository := comp.GetRepository()
-			key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
-
 			branchLog := compLog.WithValues("repository", repository,
-				"branch", branch,
+				"branch", versionName,
 				"gitHost", host)
 			ctx = ctrllog.IntoContext(ctx, branchLog)
 
+			key := fmt.Sprintf("%s/%s@%s", host, repository, versionName)
 			if slices.Contains(processedComponents, key) {
 				// PipelineRun has already been created for this repo-branch
 				branchLog.Info("PipelineRun has been created for this component-key", "component-key", key)
@@ -539,7 +538,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			}
 
 			plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, branch, kiteSecretName)
+			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, versionName, kiteSecretName)
 			if err != nil {
 				branchLog.Error(err, "failed to create PipelineRun")
 				mintmakermetrics.CountScheduledRunFailure()
