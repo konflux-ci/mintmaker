@@ -335,6 +335,18 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	// Add Kite integration if enabled AND token is available
 	if kiteSecretName != "" {
 		builder.WithKiteIntegration(config.Get().Kite.APIURL)
+		opts := tekton.NewMountOptions().
+			WithTaskName("build").
+			WithStepNames([]string{"log-analyzer"}).
+			WithReadOnly(true)
+		builder.WithConfigMap(
+			"openshift-service-ca.crt",
+			"/etc/pki/kite-ca",
+			[]corev1.KeyToPath{
+				{Key: "service-ca.crt", Path: "ca.crt"},
+			},
+			opts,
+		)
 
 		tokenSecretItems := []corev1.KeyToPath{
 			{

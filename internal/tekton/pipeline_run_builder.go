@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 	"unicode"
 
@@ -286,6 +287,12 @@ func (b *PipelineRunBuilder) WithLabels(labels map[string]string) *PipelineRunBu
 	return b
 }
 
+// sanitizeVolumeName returns a name safe for use as a Kubernetes volume name (DNS-1123 label).
+// Volume names must not contain dots.
+func sanitizeVolumeName(name string) string {
+	return strings.ReplaceAll(name, ".", "-")
+}
+
 // Mounts a ConfigMap to the specified task and steps.
 // - name: ConfigMap name
 // - mountPath: where the ConfigMap should be mounted to
@@ -306,7 +313,7 @@ func (b *PipelineRunBuilder) WithConfigMap(name, mountPath string, items []corev
 	for i, task := range b.pipelineRun.Spec.PipelineSpec.Tasks {
 		// Add volume when task matches
 		if task.Name == opts.TaskName && task.TaskSpec != nil {
-			volumeName := fmt.Sprintf("configmap-%s", name)
+			volumeName := fmt.Sprintf("configmap-%s", sanitizeVolumeName(name))
 			volume := corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -367,7 +374,7 @@ func (b *PipelineRunBuilder) WithSecret(name, mountPath string, items []corev1.K
 		if task.Name == opts.TaskName && task.TaskSpec != nil {
 			// Generate unique volume name using random string to avoid conflicts
 			// when the same secret is mounted multiple times
-			volumeName := fmt.Sprintf("secret-%s-%s", name, utils.RandomString(8))
+			volumeName := fmt.Sprintf("secret-%s-%s", sanitizeVolumeName(name), utils.RandomString(8))
 			volume := corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -546,6 +553,10 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 								FieldPath: "metadata.labels['tekton.dev/pipelineRun']",
 							},
 						},
+					},
+					{
+						Name:  "SSL_CERT_FILE",
+						Value: "/etc/pki/kite-ca/ca.crt",
 					},
 					{
 						Name:  "KITE_API_URL",
