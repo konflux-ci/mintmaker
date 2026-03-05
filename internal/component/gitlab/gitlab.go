@@ -46,7 +46,7 @@ type Repository struct {
 	Repository   string
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
+func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string, oldCRDVersion bool) (*Component, error) {
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
 	if err != nil {
@@ -63,29 +63,48 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 
 	return &Component{
 		BaseComponent: base.BaseComponent{
-			Name:        comp.Name,
-			Namespace:   comp.Namespace,
-			Application: comp.Spec.Application,
-			Platform:    platform,
-			Host:        host,
-			GitURL:      giturl,
-			Repository:  repository,
-			Versions:    versions,
+			Name:          comp.Name,
+			Namespace:     comp.Namespace,
+			Application:   comp.Spec.Application,
+			Platform:      platform,
+			Host:          host,
+			GitURL:        giturl,
+			Repository:    repository,
+			Versions:      versions,
+			OldCRDVersion: oldCRDVersion,
 		},
 		client: client,
 		ctx:    ctx,
 	}, nil
 }
 
-func (c *Component) GetBranches() []string {
-	if len(c.Versions) == 0 {
-		branch, err := c.getDefaultBranch()
+func (c *Component) GetBranches() ([]string, error) {
+	if len(c.Versions) == 0 && c.OldCRDVersion {
+		defaultBranch, err := c.getDefaultBranch()
 		if err != nil {
-			return []string{}
+			return []string{}, fmt.Errorf("component does not have a branch specified and failed to get default branch: %w", err)
 		}
-		return []string{branch}
+		return []string{defaultBranch}, nil
 	}
-	return c.Versions
+
+	var branches []string
+	client, err := c.getClient()
+	if err != nil {
+		return []string{}, fmt.Errorf("failed to get GitLab client: %w", err)
+	}
+
+	for _, version := range c.Versions {
+		_, _, err := client.Branches.GetBranch(c.Repository, version, nil)
+		if err == nil {
+			branches = append(branches, version)
+		}
+	}
+
+	if len(branches) == 0 {
+		return []string{}, fmt.Errorf("no versions found or all versions are tags (not branches)")
+	}
+
+	return branches, nil
 }
 
 func (c *Component) lookupSecret() (*corev1.Secret, error) {
@@ -183,16 +202,11 @@ func (c *Component) GetAPIEndpoint() string {
 }
 
 func (c *Component) getDefaultBranch() (string, error) {
-	token, err := c.GetToken()
+	client, err := c.getClient()
 	if err != nil {
-		return "", fmt.Errorf("failed to get GitLab token: %w", err)
+		return "", fmt.Errorf("failed to get GitLab client: %w", err)
 	}
-	u, err := url.Parse(c.GitURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse git url: %w", err)
-	}
-	baseUrl := u.Scheme + "://" + c.Host
-	client, _ := gitlab.NewClient(token, gitlab.WithBaseURL(baseUrl))
+
 	project, _, err := client.Projects.GetProject(c.Repository, nil)
 	if err != nil {
 		return "", err
@@ -200,6 +214,7 @@ func (c *Component) getDefaultBranch() (string, error) {
 	if project == nil {
 		return "", fmt.Errorf("project info is empty in GitLab API response")
 	}
+
 	return project.DefaultBranch, nil
 }
 
@@ -237,4 +252,22 @@ func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBran
 	}
 
 	return string(updatedConfig), nil
+}
+
+func (c *Component) getClient() (*gitlab.Client, error) {
+	token, err := c.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GitLab token: %w", err)
+	}
+	u, err := url.Parse(c.GitURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse git url: %w", err)
+	}
+	baseUrl := u.Scheme + "://" + c.Host
+	client, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseUrl))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
+	}
+
+	return client, nil
 }

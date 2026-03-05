@@ -46,8 +46,9 @@ type BaseComponent struct {
 	GitURL      string
 	// Path of repository, without hostname
 	// Temporary field to make the implementation easy, it's part of GitURL, so they're duplicated
-	Repository string
-	Versions   []string
+	Repository    string
+	Versions      []string
+	OldCRDVersion bool
 }
 
 func (c *BaseComponent) GetName() string {

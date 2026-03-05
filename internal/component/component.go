@@ -37,7 +37,7 @@ type GitComponent interface {
 	GetGitURL() string
 	GetRepository() string
 	GetToken() (string, error)
-	GetBranches() []string
+	GetBranches() ([]string, error)
 	GetAPIEndpoint() string
 	GetRenovateConfig(*corev1.Secret, string) (string, error)
 	GetRPMActivationKey(context.Context, client.Client) (string, string, error)
@@ -45,7 +45,7 @@ type GitComponent interface {
 
 func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (GitComponent, error) {
 	// First check if source url exists and is properly defined
-	gitUrl, err := GetGitURL(comp)
+	gitUrl, oldCRDVersion, err := GetGitURL(comp)
 	if err != nil {
 		return nil, err
 	}
@@ -57,13 +57,13 @@ func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, cli
 
 	switch platform {
 	case "github":
-		c, err := github.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp))
+		c, err := github.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp), oldCRDVersion)
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
 		return c, nil
 	case "gitlab":
-		c, err := gitlab.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp))
+		c, err := gitlab.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp), oldCRDVersion)
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
@@ -75,16 +75,17 @@ func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, cli
 
 // GetGitURL returns the git URL for the component
 // It supports both the old and new component models
-func GetGitURL(comp *appstudiov1alpha1.Component) (string, error) {
+// It returns a boolean indicating if the component is using the old model
+func GetGitURL(comp *appstudiov1alpha1.Component) (string, bool, error) {
 	if comp.Spec.Source.GitSource != nil && comp.Spec.Source.GitSource.URL != "" {
-		return comp.Spec.Source.GitSource.URL, nil
+		return comp.Spec.Source.GitSource.URL, true, nil
 	}
 
 	if comp.Spec.Source.GitURL != "" {
-		return comp.Spec.Source.GitURL, nil
+		return comp.Spec.Source.GitURL, false, nil
 	}
 
-	return "", fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
+	return "", false, fmt.Errorf("component %s has no git source or empty URL defined", comp.Name)
 }
 
 func GetVersions(comp *appstudiov1alpha1.Component) []string {
