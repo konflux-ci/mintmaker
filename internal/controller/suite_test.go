@@ -17,7 +17,9 @@ package controller
 import (
 	"context"
 	"go/build"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,6 +64,23 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+// moduleDir returns the on-disk path for a Go module dependency, resolving the
+// version from go.mod so it stays in sync automatically.
+func moduleDir(modulePath string, subPath ...string) string {
+	data, err := os.ReadFile(filepath.Join("..", "..", "go.mod"))
+	if err != nil {
+		panic("could not read go.mod: " + err.Error())
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == modulePath {
+			parts := append([]string{build.Default.GOPATH, "pkg", "mod", modulePath + "@" + fields[1]}, subPath...)
+			return filepath.Join(parts...)
+		}
+	}
+	panic("module not found in go.mod: " + modulePath)
+}
+
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
@@ -70,13 +89,11 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 
-	applicationApiDepVersion := "v0.0.0-20260203154344-6f2d131cfcbe"
-	pipelineDepVersion := "v1.9.0"
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("../..", "config", "crd", "bases"),
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "konflux-ci", "application-api@"+applicationApiDepVersion, "config", "crd", "bases"),
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "tektoncd", "pipeline@"+pipelineDepVersion, "config", "300-crds"),
+			moduleDir("github.com/konflux-ci/application-api", "config", "crd", "bases"),
+			moduleDir("github.com/tektoncd/pipeline", "config", "300-crds"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}
