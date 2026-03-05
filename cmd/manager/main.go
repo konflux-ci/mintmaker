@@ -43,6 +43,7 @@ import (
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/component"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/controller"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/metrics"
@@ -218,8 +219,9 @@ func main() {
 	}
 
 	if err = (&controller.DependencyUpdateCheckReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		NewGitComponent: component.NewGitComponent,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DependencyUpdateCheck")
 		os.Exit(1)
@@ -234,8 +236,9 @@ func main() {
 	}
 
 	if err = (&controller.EventReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		NewGitComponent: component.NewGitComponent,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Event")
 		os.Exit(1)

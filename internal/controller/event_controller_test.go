@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -26,15 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ghcomponent "github.com/konflux-ci/mintmaker/internal/component/github"
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/component"
+	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
 var _ = Describe("Event Controller", func() {
-
-	var (
-		origGetTokenFn func() (string, error)
-	)
 
 	// Test both component model versions: v1 (old model with GitSource) and v2 (new model with GitURL)
 	componentModelVersions := []string{"v1", "v2"}
@@ -57,26 +56,15 @@ var _ = Describe("Event Controller", func() {
 			)
 
 			BeforeEach(func() {
-				origGetTokenFn = ghcomponent.GetTokenFn
-				ghcomponent.GetTokenFn = func() (string, error) {
-					return "fake-token", nil
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, _ *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetToken().Return("fake-token", nil).Maybe()
+					return mockComp, nil
 				}
 
 				createNamespace(MintMakerNamespaceName)
 				createNamespace(componentNamespace)
-
-				// Create the pipelines-as-code-secret
-				pacSecret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pipelines-as-code-secret",
-						Namespace: MintMakerNamespaceName,
-					},
-					Data: map[string][]byte{
-						"github-application-id": []byte("12345"),
-						"github-private-key":    []byte(testPrivateKey),
-					},
-				}
-				Expect(k8sClient.Create(ctx, pacSecret)).Should(Succeed())
 
 				componentKey := types.NamespacedName{Name: componentName, Namespace: componentNamespace}
 				createComponent(
@@ -119,12 +107,10 @@ var _ = Describe("Event Controller", func() {
 			})
 
 			AfterEach(func() {
-				ghcomponent.GetTokenFn = origGetTokenFn
 				deleteEvents(MintMakerNamespaceName)
 				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
 				Expect(k8sClient.Delete(ctx, secret)).Should(Succeed())
 				deleteComponent(types.NamespacedName{Name: componentName, Namespace: componentNamespace})
-				deleteSecret(types.NamespacedName{Name: "pipelines-as-code-secret", Namespace: MintMakerNamespaceName})
 				deletePipelineRun(types.NamespacedName{Name: "test-pr", Namespace: MintMakerNamespaceName})
 			})
 
@@ -311,8 +297,11 @@ var _ = Describe("Event Controller", func() {
 				pod.Labels["tekton.dev/pipelineRun"] = prName
 				Expect(k8sClient.Update(ctx, pod)).Should(Succeed())
 
-				ghcomponent.GetTokenFn = func() (string, error) {
-					return "", errors.New("token error")
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, _ *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetToken().Return("", errors.New("token error")).Maybe()
+					return mockComp, nil
 				}
 
 				event := &corev1.Event{

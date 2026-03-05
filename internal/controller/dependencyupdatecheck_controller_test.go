@@ -15,24 +15,25 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ghcomponent "github.com/konflux-ci/mintmaker/internal/component/github"
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/component"
+	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
 var _ = Describe("DependencyUpdateCheck Controller", func() {
-
-	var (
-		origGetRenovateConfig func(registrySecret *corev1.Secret, currentBranch string) (string, error)
-		origGetTokenFn        func() (string, error)
-	)
 
 	// Test both component model versions: v1 (old model with GitSource) and v2 (new model with GitURL)
 	componentModelVersions := []string{"v1", "v2"}
@@ -63,24 +64,24 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				createComponent(
 					types.NamespacedName{Name: componentName, Namespace: componentNamespace}, crdVersion, "app", "https://github.com/testcomp.git", "gitrevision", "gitsourcecontext",
 				)
-				secretData := map[string]string{
-					"github-application-id": "1234567890",
-					"github-private-key":    testPrivateKey,
-				}
-				createSecret(
-					types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"}, corev1.SecretTypeOpaque, nil, secretData,
-				)
-				configMapData := map[string]string{"renovate.json": "{}"}
-				createConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"}, configMapData)
 
-				origGetRenovateConfig = ghcomponent.GetRenovateConfigFn
-				ghcomponent.GetRenovateConfigFn = func(registrySecret *corev1.Secret, currentBranch string) (string, error) {
-					return "mock config", nil
-				}
-
-				origGetTokenFn = ghcomponent.GetTokenFn
-				ghcomponent.GetTokenFn = func() (string, error) {
-					return "tokenstring", nil
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, appComp *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					branches := component.GetVersions(appComp)
+					if len(branches) == 0 {
+						branches = []string{"main"}
+					}
+					mockComp.EXPECT().GetBranches().Return(branches).Maybe()
+					mockComp.EXPECT().GetName().Return(appComp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(appComp.Namespace).Maybe()
+					mockComp.EXPECT().GetApplication().Return(appComp.Spec.Application).Maybe()
+					mockComp.EXPECT().GetPlatform().Return("github").Maybe()
+					mockComp.EXPECT().GetHost().Return("github.com").Maybe()
+					mockComp.EXPECT().GetRepository().Return("testcomp").Maybe()
+					mockComp.EXPECT().GetRenovateConfig(mock.Anything, mock.Anything).Return("mock config", nil).Maybe()
+					mockComp.EXPECT().GetRPMActivationKey(mock.Anything, mock.Anything).Return("", "", fmt.Errorf("no rpm key")).Maybe()
+					return mockComp, nil
 				}
 
 				Expect(listPipelineRuns(MintMakerNamespaceName)).Should(HaveLen(0))
@@ -89,10 +90,6 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 			_ = AfterEach(func() {
 				deletePipelineRuns(MintMakerNamespaceName)
 				deleteComponent(types.NamespacedName{Name: componentName, Namespace: componentNamespace})
-				deleteSecret(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "pipelines-as-code-secret"})
-				deleteConfigMap(types.NamespacedName{Namespace: MintMakerNamespaceName, Name: "renovate-config"})
-				ghcomponent.GetRenovateConfigFn = origGetRenovateConfig
-				ghcomponent.GetTokenFn = origGetTokenFn
 			})
 
 			It("should create pipelineruns for each branch/version", func() {

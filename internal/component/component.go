@@ -28,6 +28,9 @@ import (
 	utils "github.com/konflux-ci/mintmaker/internal/utils"
 )
 
+// GitComponentFactory is a function that creates a GitComponent from a Kubernetes Component resource.
+type GitComponentFactory func(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client) (GitComponent, error)
+
 type GitComponent interface {
 	GetName() string
 	GetNamespace() string

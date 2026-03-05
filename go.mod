@@ -11,6 +11,7 @@ require (
 	github.com/konflux-ci/application-api v0.0.0-20260203154344-6f2d131cfcbe
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
+	github.com/stretchr/testify v1.11.1
 	github.com/tektoncd/pipeline v1.9.0
 	gitlab.com/gitlab-org/api/client-go v1.26.0
 	golang.org/x/oauth2 v0.34.0
@@ -45,6 +46,7 @@ require (
 	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect
@@ -60,6 +62,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiserver v0.35.0 // indirect
 	k8s.io/component-base v0.35.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect

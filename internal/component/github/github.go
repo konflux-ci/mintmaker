@@ -48,9 +48,6 @@ var (
 	ghAppPrivateKey             []byte
 	ghUserID                    int64
 	ghAppSlug                   string
-	// vars for mocking purposes, during testing
-	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
-	GetTokenFn          func() (string, error)
 )
 
 type AppInstallation struct {
@@ -164,11 +161,6 @@ func (c *Component) getInstallationID() (int64, error) {
 }
 
 func (c *Component) GetToken() (string, error) {
-
-	if GetTokenFn != nil {
-		return GetTokenFn()
-	}
-
 	installationID, err := c.getInstallationID()
 	if err != nil {
 		return "", fmt.Errorf("failed to get installation ID: %w", err)
@@ -367,10 +359,6 @@ func (c *Component) getUserId(username string) (int64, error) {
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBranch string) (string, error) {
-	if GetRenovateConfigFn != nil {
-		return GetRenovateConfigFn(registrySecret, currentBranch)
-	}
-
 	baseConfig, err := c.GetRenovateBaseConfig(c.ctx, c.client)
 	if err != nil {
 		return "", err
