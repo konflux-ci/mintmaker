@@ -233,6 +233,10 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 													Name:  "DNF_VAR_SSL_CLIENT_CERT",
 													Value: "/workspace/shared-data/rpm-certs/cert.pem",
 												},
+												{
+													Name:  "RENOVATE_X_GITLAB_AUTO_MERGEABLE_CHECK_ATTEMPS",
+													Value: "7",
+												},
 											},
 										},
 									},
