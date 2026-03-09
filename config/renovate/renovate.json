@@ -571,8 +571,8 @@
           "registry.access.stage.redhat.com/rhscl/**",
           "registry.access.stage.redhat.com/ubi*{,/}**",
           "redhat/**",
-          "registry.redhat.io/*",
-          "registry.stage.redhat.io/*"
+          "registry.redhat.io/**",
+          "registry.stage.redhat.io/**"
         ],
         "versioning": "redhat"
       }
