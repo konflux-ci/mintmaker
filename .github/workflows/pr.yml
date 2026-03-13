@@ -1,5 +1,7 @@
 name: Validate PRs
 on:
+  push:
+    branches: [main]
   pull_request:
     types:
       - opened
@@ -9,6 +11,8 @@ jobs:
   go:
     name: Check sources
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     env:
       OPERATOR_SDK_VERSION: v1.39.1
     steps:
@@ -88,6 +92,13 @@ jobs:
           fi
       - name: Run Go Tests
         run: make test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          flags: unit-tests
+          files: cover.out
+          fail_ci_if_error: false
       - name: Ensure make build succeeds
         run: make build
 
