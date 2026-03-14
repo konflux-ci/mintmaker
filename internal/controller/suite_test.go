@@ -39,6 +39,7 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/component"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
@@ -51,11 +52,12 @@ const (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	k8sClient client.Client
-	testEnv   *envtest.Environment
-	ctx       context.Context
-	cancel    context.CancelFunc
-	log       logr.Logger
+	k8sClient              client.Client
+	testEnv                *envtest.Environment
+	ctx                    context.Context
+	cancel                 context.CancelFunc
+	log                    logr.Logger
+	newGitComponentForTest component.GitComponentFactory
 )
 
 func TestAPIs(t *testing.T) {
@@ -142,13 +144,17 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"))).SetupWithManager(k8sManager)
+	factory := func(ctx context.Context, comp *appstudiov1alpha1.Component, cl client.Client) (component.GitComponent, error) {
+		return newGitComponentForTest(ctx, comp, cl)
+	}
+
+	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"), factory)).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&PipelineRunReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&EventReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)
+	err = (&EventReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme(), NewGitComponent: factory}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

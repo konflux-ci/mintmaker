@@ -37,7 +37,8 @@ import (
 // EventReconciler reconciles a Event object
 type EventReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	NewGitComponent component.GitComponentFactory
 }
 
 // markEventAsProcessed adds an annotation to the event indicating it has been processed
@@ -205,7 +206,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		// Create GitComponent from Component
-		gitComp, err := component.NewGitComponent(ctx, &comp, r.Client)
+		gitComp, err := r.NewGitComponent(ctx, &comp, r.Client)
 		if err != nil {
 			errMessage = err.Error()
 			// Do not requeue, the error is not related to the cluster issues

@@ -1,0 +1,11 @@
+with-expecter: true
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+packages:
+  github.com/konflux-ci/mintmaker/internal/component:
+    interfaces:
+      GitComponent:
+        config:
+          dir: "internal/component/mocks"
+          outpkg: "mocks"

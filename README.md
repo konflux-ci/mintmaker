@@ -80,6 +80,18 @@ To run the tests, run:
 make test
 ```
 
+Controller tests use [Ginkgo](https://onsi.github.io/ginkgo/) / [Gomega](https://onsi.github.io/gomega/) with [envtest](https://book.kubebuilder.io/reference/envtest.html) for Kubernetes API simulation. The `GitComponent` interface is mocked using [mockery](https://github.com/vektra/mockery) — the generated mock is at `internal/component/mocks/mock_GitComponent.go`.
+
+If you change the `GitComponent` interface (`internal/component/component.go`), regenerate the mock:
+
+```sh
+# Install mockery if needed
+go install github.com/vektra/mockery/v2@latest
+
+# Regenerate (config is in .mockery.yaml)
+mockery
+```
+
 ## Contributing
 We welcome contributions to MintMaker! You can contribute by opening pull requests, reporting issues, or suggesting improvements. If you need to contact the maintainers, please reach out to the code owners listed in [CODEOWNERS](.github/CODEOWNERS).
 

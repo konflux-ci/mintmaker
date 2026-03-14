@@ -48,10 +48,6 @@ var (
 	ghAppPrivateKey             []byte
 	ghUserID                    int64
 	ghAppSlug                   string
-	// vars for mocking purposes, during testing
-	GetRenovateConfigFn func(registrySecret *corev1.Secret, currentBranch string) (string, error)
-	GetTokenFn          func() (string, error)
-	GetBranchesFn       func() ([]string, error)
 )
 
 type AppInstallation struct {
@@ -127,10 +123,6 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 }
 
 func (c *Component) GetBranches() ([]string, error) {
-	if GetBranchesFn != nil {
-		return GetBranchesFn()
-	}
-
 	if len(c.Versions) == 0 && c.OldCRDVersion {
 		defaultBranch, err := c.getDefaultBranch()
 		if err != nil {
@@ -192,11 +184,6 @@ func (c *Component) getInstallationID() (int64, error) {
 }
 
 func (c *Component) GetToken() (string, error) {
-
-	if GetTokenFn != nil {
-		return GetTokenFn()
-	}
-
 	installationID, err := c.getInstallationID()
 	if err != nil {
 		return "", fmt.Errorf("failed to get installation ID: %w", err)
@@ -391,10 +378,6 @@ func (c *Component) getUserId(username string) (int64, error) {
 }
 
 func (c *Component) GetRenovateConfig(registrySecret *corev1.Secret, currentBranch string) (string, error) {
-	if GetRenovateConfigFn != nil {
-		return GetRenovateConfigFn(registrySecret, currentBranch)
-	}
-
 	baseConfig, err := c.GetRenovateBaseConfig(c.ctx, c.client)
 	if err != nil {
 		return "", err

@@ -51,14 +51,16 @@ const InternalSecretLabelName = "appstudio.redhat.com/internal"
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
-	Client client.Client
-	Scheme *runtime.Scheme
+	Client          client.Client
+	Scheme          *runtime.Scheme
+	NewGitComponent component.GitComponentFactory
 }
 
-func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder) *DependencyUpdateCheckReconciler {
+func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder, newGitComponent component.GitComponentFactory) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
-		Client: client,
-		Scheme: scheme,
+		Client:          client,
+		Scheme:          scheme,
+		NewGitComponent: newGitComponent,
 	}
 }
 
@@ -517,7 +519,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			"componentNamespace", appstudioComponent.Namespace)
 		ctx = ctrllog.IntoContext(ctx, compLog)
 
-		comp, err := component.NewGitComponent(ctx, &appstudioComponent, r.Client)
+		comp, err := r.NewGitComponent(ctx, &appstudioComponent, r.Client)
 		if err != nil {
 			compLog.Error(err, "failed to handle component")
 			continue
