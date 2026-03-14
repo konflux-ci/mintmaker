@@ -23,6 +23,7 @@ import (
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
+	"github.com/konflux-ci/mintmaker/internal/component/forgejo"
 	github "github.com/konflux-ci/mintmaker/internal/component/github"
 	gitlab "github.com/konflux-ci/mintmaker/internal/component/gitlab"
 	utils "github.com/konflux-ci/mintmaker/internal/utils"
@@ -64,6 +65,12 @@ func NewGitComponent(ctx context.Context, comp *appstudiov1alpha1.Component, cli
 		return c, nil
 	case "gitlab":
 		c, err := gitlab.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp), oldCRDVersion)
+		if err != nil {
+			return nil, fmt.Errorf("error creating git component: %w", err)
+		}
+		return c, nil
+	case "forgejo":
+		c, err := forgejo.NewComponent(ctx, comp, client, gitUrl, GetVersions(comp), oldCRDVersion)
 		if err != nil {
 			return nil, fmt.Errorf("error creating git component: %w", err)
 		}
