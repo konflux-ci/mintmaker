@@ -132,7 +132,3 @@ require (
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-// Pin knative.dev/pkg to avoid breaking changes with newer versions
-// Knative migrated to OpenTelemetry, knative.dev/pkg/metrics is not available anymore
-replace knative.dev/pkg => knative.dev/pkg v0.0.0-20260314220421-b3fe2e572de3
