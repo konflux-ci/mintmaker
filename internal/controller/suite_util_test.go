@@ -301,12 +301,15 @@ func createComponent(resourceKey types.NamespacedName, crdVersion, application, 
 						GitURL: gitURL,
 						Versions: []appstudiov1alpha1.ComponentVersion{
 							{
+								Name:     "default",
 								Revision: gitRevision,
 							},
 							{
+								Name:     "v1",
 								Revision: gitRevision + "-v1",
 							},
 							{
+								Name:     "v2",
 								Revision: gitRevision + "-v2",
 							},
 						},
@@ -319,9 +322,9 @@ func createComponent(resourceKey types.NamespacedName, crdVersion, application, 
 		createdComponent := getComponent(resourceKey)
 		createdComponent.Status = appstudiov1alpha1.ComponentStatus{
 			Versions: []appstudiov1alpha1.ComponentVersionStatus{
-				{Revision: gitRevision, OnboardingStatus: "succeeded"},
-				{Revision: gitRevision + "-v1", OnboardingStatus: "succeeded"},
-				{Revision: gitRevision + "-v2", OnboardingStatus: "succeeded"},
+				{Name: "default", Revision: gitRevision, OnboardingStatus: "succeeded"},
+				{Name: "v1", Revision: gitRevision + "-v1", OnboardingStatus: "succeeded"},
+				{Name: "v2", Revision: gitRevision + "-v2", OnboardingStatus: "succeeded"},
 			},
 		}
 		Expect(k8sClient.Status().Update(ctx, createdComponent)).Should(Succeed())

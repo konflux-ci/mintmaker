@@ -16,21 +16,21 @@ package utils
 
 import "testing"
 
-func TestGetRandomString(t *testing.T) {
+func TestRandomString(t *testing.T) {
 	tests := []struct {
 		name   string
 		length int
 	}{
 		{
-			name:   "should be able to generate one symbol rangom string",
+			name:   "single character",
 			length: 1,
 		},
 		{
-			name:   "should be able to generate rangom string",
+			name:   "short string",
 			length: 5,
 		},
 		{
-			name:   "should be able to generate long rangom string",
+			name:   "long string",
 			length: 100,
 		},
 	}
@@ -38,7 +38,7 @@ func TestGetRandomString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := RandomString(tt.length)
 			if len(got) != tt.length {
-				t.Errorf("Got string %s has lenght %d but expected length is %d", got, len(got), tt.length)
+				t.Errorf("RandomString(%d) returned string of length %d, want %d", tt.length, len(got), tt.length)
 			}
 		})
 	}

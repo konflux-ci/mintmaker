@@ -285,5 +285,224 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithTimeouts(nil)
 			Expect(builder.pipelineRun.Spec.Timeouts).To(Equal(defaultTimeouts))
 		})
+
+		It("should use the default timeouts if the given timeouts are zero-valued", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			defaultTimeouts := &tektonv1.TimeoutFields{
+				Pipeline: &metav1.Duration{Duration: 1 * time.Hour},
+			}
+			builder.WithTimeouts(&tektonv1.TimeoutFields{})
+			Expect(builder.pipelineRun.Spec.Timeouts).To(Equal(defaultTimeouts))
+		})
+	})
+
+	When("WithConfigMap method is called", func() {
+		var builder *PipelineRunBuilder
+
+		BeforeEach(func() {
+			builder = NewPipelineRunBuilder("testPrefix", "testNamespace")
+		})
+
+		It("should add a configmap volume and mount to all steps by default", func() {
+			builder.WithConfigMap("my-config", "/etc/config", nil, nil)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(1))
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-config"))
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Name).To(Equal("my-config"))
+
+			for _, step := range task.TaskSpec.TaskSpec.Steps {
+				Expect(step.VolumeMounts).To(ContainElement(
+					HaveField("MountPath", "/etc/config"),
+				))
+			}
+		})
+
+		It("should mount only to specified steps when StepNames are provided", func() {
+			opts := NewMountOptions().WithStepNames([]string{"renovate"})
+			builder.WithConfigMap("my-config", "/etc/config", nil, opts)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			for _, step := range task.TaskSpec.TaskSpec.Steps {
+				if step.Name == "renovate" {
+					Expect(step.VolumeMounts).To(ContainElement(
+						HaveField("MountPath", "/etc/config"),
+					))
+				} else {
+					hasMountPath := false
+					for _, vm := range step.VolumeMounts {
+						if vm.MountPath == "/etc/config" {
+							hasMountPath = true
+						}
+					}
+					Expect(hasMountPath).To(BeFalse())
+				}
+			}
+		})
+
+		It("should use provided items for selective mounting", func() {
+			items := []corev1.KeyToPath{
+				{Key: "config.js", Path: "config.js"},
+			}
+			builder.WithConfigMap("my-config", "/etc/config", items, nil)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Items).To(Equal(items))
+		})
+
+		It("should set optional and default mode from MountOptions", func() {
+			optional := true
+			mode := int32(0755)
+			opts := &MountOptions{
+				TaskName:    "build",
+				Optional:    &optional,
+				DefaultMode: &mode,
+			}
+			builder.WithConfigMap("my-config", "/etc/config", nil, opts)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(*task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Optional).To(BeTrue())
+			Expect(*task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode).To(Equal(mode))
+		})
+
+		It("should handle dots in configmap name", func() {
+			builder.WithConfigMap("my.dotted.config", "/etc/config", nil, nil)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-dotted-config"))
+		})
+	})
+
+	When("WithSecret method is called", func() {
+		var builder *PipelineRunBuilder
+
+		BeforeEach(func() {
+			builder = NewPipelineRunBuilder("testPrefix", "testNamespace")
+		})
+
+		It("should add a secret volume and mount to all steps by default", func() {
+			builder.WithSecret("my-secret", "/etc/secret", nil, nil)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(1))
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.Secret.SecretName).To(Equal("my-secret"))
+
+			for _, step := range task.TaskSpec.TaskSpec.Steps {
+				Expect(step.VolumeMounts).To(ContainElement(
+					HaveField("MountPath", "/etc/secret"),
+				))
+			}
+		})
+
+		It("should mount only to specified steps", func() {
+			opts := NewMountOptions().WithStepNames([]string{"renovate"})
+			builder.WithSecret("my-secret", "/etc/secret", nil, opts)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			for _, step := range task.TaskSpec.TaskSpec.Steps {
+				if step.Name == "renovate" {
+					Expect(step.VolumeMounts).To(ContainElement(
+						HaveField("MountPath", "/etc/secret"),
+					))
+				} else {
+					hasMountPath := false
+					for _, vm := range step.VolumeMounts {
+						if vm.MountPath == "/etc/secret" {
+							hasMountPath = true
+						}
+					}
+					Expect(hasMountPath).To(BeFalse())
+				}
+			}
+		})
+
+		It("should generate unique volume names to allow multiple mounts of same secret", func() {
+			builder.WithSecret("my-secret", "/etc/secret1", nil, nil)
+			builder.WithSecret("my-secret", "/etc/secret2", nil, nil)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(2))
+			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).ToNot(Equal(task.TaskSpec.TaskSpec.Volumes[1].Name))
+		})
+
+		It("should set read-only to false when specified", func() {
+			opts := NewMountOptions().WithReadOnly(false)
+			builder.WithSecret("my-secret", "/etc/secret", nil, opts)
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			for _, step := range task.TaskSpec.TaskSpec.Steps {
+				for _, vm := range step.VolumeMounts {
+					if vm.MountPath == "/etc/secret" {
+						Expect(vm.ReadOnly).To(BeFalse())
+					}
+				}
+			}
+		})
+	})
+
+	When("WithKiteIntegration method is called", func() {
+		It("should add a log-analyzer step to the build task", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			builder.WithKiteIntegration("https://kite.example.com")
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			steps := task.TaskSpec.TaskSpec.Steps
+			lastStep := steps[len(steps)-1]
+
+			Expect(lastStep.Name).To(Equal("log-analyzer"))
+			Expect(lastStep.Image).To(Equal("quay.io/konflux-ci/renovate-log-analyzer:latest"))
+
+			// Verify KITE_API_URL env var is set
+			var kiteURLEnv *corev1.EnvVar
+			for i := range lastStep.Env {
+				if lastStep.Env[i].Name == "KITE_API_URL" {
+					kiteURLEnv = &lastStep.Env[i]
+					break
+				}
+			}
+			Expect(kiteURLEnv).ToNot(BeNil())
+			Expect(kiteURLEnv.Value).To(Equal("https://kite.example.com"))
+		})
+	})
+
+	When("MountOptions builder methods are called", func() {
+		It("should chain options correctly", func() {
+			opts := NewMountOptions().
+				WithTaskName("custom-task").
+				WithStepNames([]string{"step1", "step2"}).
+				WithReadOnly(false).
+				WithDefaultMode(0755).
+				WithOptional(true)
+
+			Expect(opts.TaskName).To(Equal("custom-task"))
+			Expect(opts.StepNames).To(Equal([]string{"step1", "step2"}))
+			Expect(*opts.ReadOnly).To(BeFalse())
+			Expect(*opts.DefaultMode).To(Equal(int32(0755)))
+			Expect(*opts.Optional).To(BeTrue())
+		})
+
+		It("should have sensible defaults from NewMountOptions", func() {
+			opts := NewMountOptions()
+
+			Expect(opts.TaskName).To(Equal("build"))
+			Expect(opts.StepNames).To(BeEmpty())
+			Expect(*opts.ReadOnly).To(BeTrue())
+			Expect(*opts.DefaultMode).To(Equal(int32(0644)))
+			Expect(*opts.Optional).To(BeFalse())
+		})
+	})
+
+	When("WithObjectSpecsAsJson is called with an object without Spec field", func() {
+		It("should accumulate an error", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			cm := &corev1.ConfigMap{}
+			cm.Kind = "ConfigMap"
+
+			builder.WithObjectSpecsAsJson(cm)
+
+			_, err := builder.Build()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to extract spec"))
+		})
 	})
 })

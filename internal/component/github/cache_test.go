@@ -119,15 +119,15 @@ var _ = Describe("StaleAllowedCache", func() {
 			Expect(ok).To(BeTrue())
 			Expect(data).To(Equal(oldData)) // Should get old data
 
-			// Wait for background refresh to complete
-			time.Sleep(100 * time.Millisecond)
+			// Poll until background refresh completes and new data is available
+			Eventually(func() interface{} {
+				data, _ := localCache.Get("test-key")
+				return data
+			}, 500*time.Millisecond, 10*time.Millisecond).Should(Equal("new-data"))
 
-			// Second access should get new data
-			data, ok = localCache.Get("test-key")
-
-			Expect(ok).To(BeTrue())
-			Expect(data).To(Equal("new-data"))
+			localMutex.Lock()
 			Expect(localRefreshCount).To(Equal(2))
+			localMutex.Unlock()
 		})
 	})
 
@@ -200,8 +200,12 @@ var _ = Describe("StaleAllowedCache", func() {
 
 	Context("when a refresh is in progress", func() {
 		It("should wait for refresh to complete when no stale data is available", func() {
+			var started sync.WaitGroup
+			started.Add(1)
+
 			// Set up a refresh function with a long delay
 			refreshFunc = func() (interface{}, error) {
+				started.Done() // Signal that refresh has started
 				time.Sleep(100 * time.Millisecond)
 				refreshMutex.Lock()
 				defer refreshMutex.Unlock()
@@ -216,28 +220,21 @@ var _ = Describe("StaleAllowedCache", func() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				start := time.Now()
 				data, ok := cache.Get("key")
-				duration := time.Since(start)
 
 				Expect(ok).To(BeTrue())
 				Expect(data).To(Equal("slow-data"))
-				Expect(duration).To(BeNumerically(">=", 100*time.Millisecond))
 			}()
 
-			// Start second access, this should wait for the first refresh to complete
-			time.Sleep(10 * time.Millisecond) // Give the first goroutine some time to start
-			start := time.Now()
+			// Wait until the first goroutine has actually entered the refresh function,
+			// rather than relying on a fixed sleep
+			started.Wait()
+
+			// Second access should block on the in-progress refresh
 			data, ok := cache.Get("key")
-			duration := time.Since(start)
 
 			Expect(ok).To(BeTrue())
 			Expect(data).To(Equal("slow-data"))
-			// The first goroutine takes at least 100ms to refresh the cache,
-			// we started ~10ms later, so it should take roughly 90ms for the
-			// second access to get the cache data. We use 80ms as a lower bound
-			// to account for OS scheduling variability.
-			Expect(duration).To(BeNumerically(">=", 80*time.Millisecond))
 
 			wg.Wait()
 			Expect(refreshCount).To(Equal(1))
