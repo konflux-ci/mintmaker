@@ -71,6 +71,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var pprofAddr string
+	var kubeClientQPS float64
+	var kubeClientBurst int
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -83,6 +85,8 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.Float64Var(&kubeClientQPS, "kube-api-qps", -1, "Maximum QPS to the Kubernetes API server. Use -1 to disable client-side rate limiting (default).")
+	flag.IntVar(&kubeClientBurst, "kube-api-burst", 0, "Maximum burst for throttling requests to the Kubernetes API server. Only effective when kube-api-qps >= 0.")
 	opts := zap.Options{
 		Development: false,
 	}
@@ -134,7 +138,13 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+	if kubeClientQPS >= 0 {
+		cfg.QPS = float32(kubeClientQPS)
+		cfg.Burst = kubeClientBurst
+	}
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		// Configure client to bypass cache for resources that are NOT watched
 		// and accessed infrequently. This prevents informer creation and reduces
