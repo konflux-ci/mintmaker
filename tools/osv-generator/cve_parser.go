@@ -88,6 +88,14 @@ func ConvertToOSV(vexData VEX, containerVulns bool) []OSV {
 	}
 
 	for _, vulnerability := range vexData.Vulnerabilities {
+		summary, ok := getSummary(vulnerability)
+		if !ok {
+			// SDEngine, the software that generates the VEX data,
+			// specifically omits the summary if the CVE doesn't affect any known software.
+			fmt.Printf("Skipped CVE %s because it doesn't affect any known software\n", vulnerability.Cve)
+			continue
+		}
+
 		// Create OSV vulnerability object for each CVE
 		osvVulnerability := OSV{
 			IdInternal:    uniuri.New(),
@@ -99,7 +107,7 @@ func ConvertToOSV(vexData VEX, containerVulns bool) []OSV {
 			},
 			Modified:   time.Now().Format("2006-01-02T15:04:05Z"),
 			Published:  getPublishedDate(vulnerability),
-			Summary:    getSummary(vulnerability),
+			Summary:    summary,
 			Details:    getDetails(vulnerability),
 			References: getReferencesList(vulnerability),
 			Affected:   affectedList,
@@ -259,13 +267,14 @@ func getDetails(vulnerability *Vulnerability) string {
 	panic("No CVE details found")
 }
 
-func getSummary(vulnerability *Vulnerability) string {
+func getSummary(vulnerability *Vulnerability) (string, bool) {
 	for _, note := range vulnerability.Notes {
 		if note.Category == "summary" {
-			return note.Text
+			return note.Text, true
 		}
 	}
-	panic("No CVE summary found")
+
+	return "", false
 }
 
 func getPublishedDate(vulnerability *Vulnerability) string {

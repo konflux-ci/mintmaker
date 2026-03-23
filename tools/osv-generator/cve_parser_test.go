@@ -140,9 +140,52 @@ func TestGetDetails(t *testing.T) {
 }
 
 func TestGetSummary(t *testing.T) {
-	summary := getSummary(vexSampleObject.Vulnerabilities[0])
+	summary, ok := getSummary(vexSampleObject.Vulnerabilities[0])
+	if !ok {
+		t.Fatal("expected summary to be present")
+	}
 	if summary != "Test summary" {
-		t.Fatalf("expected 'Test description', got %s", summary)
+		t.Fatalf("expected 'Test summary', got %s", summary)
+	}
+}
+
+func TestGetSummaryMissing(t *testing.T) {
+	vulnerability := &Vulnerability{
+		Cve: "CVE-2022-9999",
+		Notes: []struct {
+			Category string `json:"category"`
+			Text     string `json:"text"`
+		}{
+			{Category: "description", Text: "Some details"},
+		},
+	}
+	summary, ok := getSummary(vulnerability)
+	if ok {
+		t.Fatal("expected summary to be absent")
+	}
+	if summary != "" {
+		t.Fatalf("expected empty string, got %s", summary)
+	}
+}
+
+func TestConvertToOSVSkipsVulnerabilityWithNoSummary(t *testing.T) {
+	vex := VEX{}
+	vex.Document.AggregateSeverity.Text = "High"
+	vex.Vulnerabilities = []*Vulnerability{
+		{
+			Cve: "CVE-2022-9999",
+			Notes: []struct {
+				Category string `json:"category"`
+				Text     string `json:"text"`
+			}{
+				{Category: "description", Text: "Some details"},
+			},
+		},
+	}
+
+	osv := ConvertToOSV(vex, false)
+	if len(osv) != 0 {
+		t.Fatalf("expected 0 OSVs (vulnerability should be skipped), got %d", len(osv))
 	}
 }
 
