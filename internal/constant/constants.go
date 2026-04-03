@@ -24,6 +24,11 @@ const (
 	// Label for the Kite token secret, used to find the secret in the namespace
 	KiteTokenSecretLabel = "mintmaker.appstudio.redhat.com/kite-token"
 
+	// Label storing a truncated SHA256 hash of host/repository@branch.
+	// Used to find active PipelineRuns for a given repo+branch combination.
+	// Using hash because k8s label value doesn't support `/` (in repo path)
+	MintMakerRepoBranchHashLabel = "mintmaker.appstudio.redhat.com/repo-branch-hash"
+
 	RenovateImageEnvName    = "RENOVATE_IMAGE"
 	DefaultRenovateImageURL = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
 )

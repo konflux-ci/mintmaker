@@ -15,9 +15,19 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"regexp"
 	"strings"
 )
+
+// RepoBranchHash returns a truncated SHA256 hex digest of the given key.
+// The result is safe for use as a Kubernetes label value (63 chars max, alphanumeric).
+func RepoBranchHash(host, repository, branch string) string {
+	key := fmt.Sprintf("%s/%s@%s", host, repository, branch)
+	sum := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("%x", sum)[:12]
+}
 
 // SanitizeLabelValue sanitizes a string to be valid for Kubernetes label values.
 // It handles common restrictions like maximum length (63 chars) and disallowed characters.
