@@ -147,3 +147,49 @@ func isValidKubernetesLabelValue(value string) bool {
 func isAlphanumeric(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
 }
+
+func TestRepoBranchHash(t *testing.T) {
+	t.Run("deterministic", func(t *testing.T) {
+		h1 := RepoBranchHash("github.com", "org/repo", "main")
+		h2 := RepoBranchHash("github.com", "org/repo", "main")
+		if h1 != h2 {
+			t.Errorf("expected deterministic output, got %q and %q", h1, h2)
+		}
+	})
+
+	t.Run("length is 12", func(t *testing.T) {
+		h := RepoBranchHash("github.com", "org/repo", "main")
+		if len(h) != 12 {
+			t.Errorf("expected length 12, got %d", len(h))
+		}
+	})
+
+	t.Run("valid label value", func(t *testing.T) {
+		h := RepoBranchHash("github.com", "org/repo", "main")
+		if !isValidKubernetesLabelValue(h) {
+			t.Errorf("hash %q is not a valid Kubernetes label value", h)
+		}
+	})
+
+	t.Run("different inputs produce different hashes", func(t *testing.T) {
+		h1 := RepoBranchHash("github.com", "org/repo", "main")
+		h2 := RepoBranchHash("github.com", "org/repo", "develop")
+		h3 := RepoBranchHash("github.com", "other/repo", "main")
+		if h1 == h2 {
+			t.Error("different branches should produce different hashes")
+		}
+		if h1 == h3 {
+			t.Error("different repositories should produce different hashes")
+		}
+	})
+
+	t.Run("distinguishes normalized-identical repos", func(t *testing.T) {
+		// org/repo normalizes to org_repo, same as org_repo
+		// but their hashes should differ
+		h1 := RepoBranchHash("github.com", "org/repo", "main")
+		h2 := RepoBranchHash("github.com", "org_repo", "main")
+		if h1 == h2 {
+			t.Error("org/repo and org_repo should produce different hashes")
+		}
+	})
+}

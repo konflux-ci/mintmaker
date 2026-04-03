@@ -158,6 +158,47 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 	return mergedDockerConfigJson, nil
 }
 
+// hasActivePipelineRun checks if there is an active (pending or running) PipelineRun
+// for the given host/repository/branch combination using the repo-branch-hash label.
+func (r *DependencyUpdateCheckReconciler) hasActivePipelineRun(ctx context.Context, host, repository, branch string) (bool, error) {
+	log := ctrllog.FromContext(ctx)
+
+	pipelineRuns := &tektonv1.PipelineRunList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(MintMakerNamespaceName),
+		client.MatchingLabels{
+			MintMakerRepoBranchHashLabel: utils.RepoBranchHash(host, repository, branch),
+		},
+	}
+
+	if err := r.Client.List(ctx, pipelineRuns, listOpts...); err != nil {
+		return false, err
+	}
+
+	for _, pr := range pipelineRuns.Items {
+		if !pipelineRunCompleted(&pr) {
+			log.Info("found active PipelineRun", "pipelineRun", pr.Name)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// pipelineRunCompleted returns true if the PipelineRun has reached a terminal state
+// (succeeded, failed, or cancelled).
+func pipelineRunCompleted(pr *tektonv1.PipelineRun) bool {
+	for _, c := range pr.Status.Conditions {
+		if string(c.Type) == "Succeeded" {
+			// Status "Unknown" means still in progress (including Pending)
+			// Status "True" means succeeded, "False" means failed/cancelled
+			return c.Status != corev1.ConditionUnknown
+		}
+	}
+	// No Succeeded condition means the PipelineRun hasn't been processed yet
+	return false
+}
+
 // createPipelineRun creates and returns a new PipelineRun
 func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, currentBranch string, kiteSecretName string) (*tektonv1.PipelineRun, error) {
 
@@ -268,6 +309,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
 			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(currentBranch),
+			MintMakerRepoBranchHashLabel:                  utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -549,6 +591,17 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 				continue
 			} else {
 				processedComponents = append(processedComponents, key)
+			}
+
+			// Skip if there is already an active (pending/running) PipelineRun for this repo+branch
+			active, err := r.hasActivePipelineRun(ctx, host, repository, branchName)
+			if err != nil {
+				branchLog.Error(err, "failed to check for active PipelineRuns")
+				continue
+			}
+			if active {
+				branchLog.Info("skipping PipelineRun creation, active PipelineRun already exists", "component-key", key)
+				continue
 			}
 
 			plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))

@@ -31,6 +31,7 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 var _ = Describe("DependencyUpdateCheck Controller", func() {
@@ -133,6 +134,62 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				createDependencyUpdateCheck(types.NamespacedName{Namespace: "default", Name: dependencyUpdateCheckName}, false, nil)
 				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
 				deleteDependencyUpdateCheck(types.NamespacedName{Namespace: "default", Name: dependencyUpdateCheckName})
+			})
+
+			It("should not create a pipelinerun if an active one already exists for the same repo+branch", func() {
+				// The mock returns "gitrevision" as the branch for v1,
+				// and "gitrevision", "gitrevision-v1", "gitrevision-v2" for v2.
+				// Pre-create active PipelineRuns for all branches to block all creation.
+				branches := []string{"gitrevision"}
+				if crdVersion == "v2" {
+					branches = []string{"gitrevision", "gitrevision-v1", "gitrevision-v2"}
+				}
+				for i, branch := range branches {
+					hashValue := utils.RepoBranchHash("github.com", "testcomp", branch)
+					labels := map[string]string{
+						MintMakerRepoBranchHashLabel: hashValue,
+					}
+					createMintmakerPipelineRun(fmt.Sprintf("existing-active-pr-%d", i), MintMakerNamespaceName, labels, "")
+				}
+
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+				// Only the pre-existing PipelineRuns should remain; no new ones created
+				Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(len(branches)))
+
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			It("should create a pipelinerun if existing ones for the same repo+branch have completed", func() {
+				// Pre-create a completed PipelineRun for the first branch
+				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
+				labels := map[string]string{
+					MintMakerRepoBranchHashLabel: hashValue,
+				}
+				createMintmakerPipelineRun("completed-pr", MintMakerNamespaceName, labels, corev1.ConditionTrue)
+
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+				// Should have the completed one + newly created ones
+				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1 + expectedPipelineRuns))
+
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			It("should create a pipelinerun if existing ones for the same repo+branch have failed", func() {
+				// Pre-create a failed PipelineRun for the first branch
+				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
+				labels := map[string]string{
+					MintMakerRepoBranchHashLabel: hashValue,
+				}
+				createMintmakerPipelineRun("failed-pr", MintMakerNamespaceName, labels, corev1.ConditionFalse)
+
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+				// Should have the failed one + newly created ones
+				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1 + expectedPipelineRuns))
+
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
 			})
 
 			Context("When getting a merged docker config for a pipelinerun", func() {

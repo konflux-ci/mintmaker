@@ -24,6 +24,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	knativeapis "knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
@@ -435,6 +436,42 @@ func deleteDependencyUpdateCheck(resourceKey types.NamespacedName) {
 	Eventually(func() bool {
 		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, dependencyUpdateCheck))
 	}, timeout, interval).Should(BeTrue())
+}
+
+func createMintmakerPipelineRun(name, namespace string, labels map[string]string, succeeded corev1.ConditionStatus) {
+	pr := &tektonv1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: tektonv1.PipelineRunSpec{
+			PipelineSpec: &tektonv1.PipelineSpec{
+				Tasks: []tektonv1.PipelineTask{
+					{
+						Name: "noop",
+						TaskSpec: &tektonv1.EmbeddedTask{
+							TaskSpec: tektonv1.TaskSpec{
+								Steps: []tektonv1.Step{
+									{Name: "noop", Image: "busybox", Script: "echo noop"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, pr)).Should(Succeed())
+
+	// Update status with the given condition if not empty string
+	if succeeded != "" {
+		pr.Status.SetCondition(&knativeapis.Condition{
+			Type:   knativeapis.ConditionSucceeded,
+			Status: succeeded,
+		})
+		Expect(k8sClient.Status().Update(ctx, pr)).Should(Succeed())
+	}
 }
 
 func listPipelineRuns(namespace string) []tektonv1.PipelineRun {
