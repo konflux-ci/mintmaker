@@ -25,6 +25,7 @@
   },
   "additionalBranchPrefix": "{{baseBranch}}/",
   "branchPrefix": "konflux/mintmaker/",
+  "commitMessagePrefix": "[{{baseBranch}}] ",
   "enabledManagers": [
     "github-actions",
     "tekton",
