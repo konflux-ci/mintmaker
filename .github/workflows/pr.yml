@@ -102,6 +102,29 @@ jobs:
       - name: Ensure make build succeeds
         run: make build
 
+  gitlint:
+    name: Run gitlint checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Install gitlint into container
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          python3 -m pip install gitlint
+      - name: Run gitlint check
+        run: |
+          source venv/bin/activate
+          RAW_BASE_REF="${{ github.base_ref || github.event.merge_group.base_ref }}"
+          BASE_REF="${RAW_BASE_REF#refs/heads/}"
+          echo "Base ref: $BASE_REF"
+          git fetch origin "$BASE_REF"
+          gitlint --commits "origin/$BASE_REF"..HEAD
+
   kube-linter:
     name: Lint Kubernetes manifests
     runs-on: ubuntu-latest
