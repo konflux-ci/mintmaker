@@ -22,7 +22,7 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager cmd/manager/main.go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o osv-generator cmd/osv-generator/main.go
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:fe9e574f04371b333ed4e21d30d984f6b7fcd1046e579f5ddab4816c0c8e231d
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:12db9874bd753eb98b1ab3d840e75de5d6842ac0604fbd68c012adefe97140be
 WORKDIR /
 # OpenShift preflight check requires licensing files under /licenses
 COPY licenses/ licenses
