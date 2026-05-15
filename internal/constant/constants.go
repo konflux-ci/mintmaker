@@ -31,4 +31,7 @@ const (
 
 	RenovateImageEnvName    = "RENOVATE_IMAGE"
 	DefaultRenovateImageURL = "quay.io/konflux-ci/mintmaker-renovate-image:latest"
+
+	LeakTKImageEnvName    = "LEAKTK_IMAGE"
+	DefaultLeakTKImageURL = "quay.io/leaktk/leakt:latest"
 )
