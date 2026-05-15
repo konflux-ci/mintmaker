@@ -103,6 +103,10 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 	if renovateImageURL == "" {
 		renovateImageURL = mmconst.DefaultRenovateImageURL
 	}
+	leaktkImageURL := os.Getenv(LeakTKImageEnvName)
+	if leaktkImageURL == "" {
+		leaktkImageURL = DefaultLeakTKImageURL
+	}
 	return &PipelineRunBuilder{
 		pipelineRun: &tektonv1.PipelineRun{
 			ObjectMeta: metav1.ObjectMeta{
@@ -236,6 +240,76 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												{
 													Name:  "RENOVATE_X_GITLAB_AUTO_MERGEABLE_CHECK_ATTEMPS",
 													Value: "7",
+												},
+											},
+										},
+										{
+											Name:  "log-sanitizer",
+											Image: leaktkImageURL,
+											Env: []corev1.EnvVar{
+												{
+													Name:  "HOME",
+													Value: "/tmp",
+												},
+											},
+											Script: "#!/bin/sh\n" +
+												"LOG_FILE=\"/workspace/shared-data/renovate-logs.json\"\n" +
+												"FAIL_MSG='Sanitization step failed; the entire logs of this execution were removed for caution'\n" +
+												"fail_safe() {\n" +
+												"  echo \"$FAIL_MSG\"\n" +
+												"  echo \"$FAIL_MSG\" > \"$LOG_FILE\"\n" +
+												"  exit 0\n" +
+												"}\n" +
+												"if [ ! -f \"$LOG_FILE\" ]; then\n" +
+												"  echo 'Log file not found, skipping sanitization'\n" +
+												"  exit 0\n" +
+												"fi\n" +
+												"echo 'Scanning log file for leaked secrets...'\n" +
+												"SCAN_OUTPUT=$(leaktk scan --kind JSONData \"@${LOG_FILE}\" 2>&1)\n" +
+												"if [ $? -ne 0 ]; then\n" +
+												"  echo \"leaktk scan failed: $SCAN_OUTPUT\"\n" +
+												"  fail_safe\n" +
+												"fi\n" +
+												"if [ -z \"$SCAN_OUTPUT\" ]; then\n" +
+												"  echo 'No secrets detected or scanner produced no output'\n" +
+												"  exit 0\n" +
+												"fi\n" +
+												"SECRETS=$(echo \"$SCAN_OUTPUT\" | python3 -c \"\nimport sys, json\nfor r in json.load(sys.stdin).get('results',[]):\n    s = r.get('secret','')\n    if s: print(s)\n\")\n" +
+												"if [ $? -ne 0 ]; then\n" +
+												"  echo 'Failed to parse leaktk output'\n" +
+												"  fail_safe\n" +
+												"fi\n" +
+												"if [ -z \"$SECRETS\" ]; then\n" +
+												"  echo 'No secrets found in log file'\n" +
+												"  exit 0\n" +
+												"fi\n" +
+												"cp \"$LOG_FILE\" \"${LOG_FILE}.tmp\"\n" +
+												"echo \"$SECRETS\" | while IFS= read -r secret; do\n" +
+												"  if [ -n \"$secret\" ]; then\n" +
+												"    ESCAPED=$(printf '%s\\n' \"$secret\" | sed 's/[[\\.*^$()+?{|\\\\]/\\\\&/g')\n" +
+												"    sed -i \"s|${ESCAPED}|**REDACTED**|g\" \"${LOG_FILE}.tmp\"\n" +
+												"  fi\n" +
+												"done\n" +
+												"if [ $? -ne 0 ]; then\n" +
+												"  echo 'Failed to redact secrets from log file'\n" +
+												"  fail_safe\n" +
+												"fi\n" +
+												"mv \"${LOG_FILE}.tmp\" \"$LOG_FILE\"\n" +
+												"echo 'Log sanitization complete'",
+											SecurityContext: &corev1.SecurityContext{
+												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+												RunAsNonRoot:             ptr.To(true),
+												RunAsUser:                &normalUser,
+												AllowPrivilegeEscalation: ptr.To(false),
+											},
+											ComputeResources: corev1.ResourceRequirements{
+												Requests: corev1.ResourceList{
+													"cpu":    resource.MustParse("100m"),
+													"memory": resource.MustParse("256Mi"),
+												},
+												Limits: corev1.ResourceList{
+													"cpu":    resource.MustParse("100m"),
+													"memory": resource.MustParse("256Mi"),
 												},
 											},
 										},
