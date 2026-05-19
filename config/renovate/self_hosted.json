@@ -6,7 +6,8 @@
     "GOCACHE": "/tmp/go-build-cache",
     "GOTOOLCHAIN": "auto",
     "DNF_VAR_SSL_CLIENT_CERT": "/workspace/shared-data/rpm-certs/cert.pem",
-    "DNF_VAR_SSL_CLIENT_KEY": "/workspace/shared-data/rpm-certs/key.pem"
+    "DNF_VAR_SSL_CLIENT_KEY": "/workspace/shared-data/rpm-certs/key.pem",
+    "UV_NO_CACHE": "true"
   },
   "repositoryCache": "enabled",
   "repositoryCacheType": "redis://redis:6379/1",
