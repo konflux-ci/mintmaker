@@ -1,200 +1,104 @@
-# Developer documentation
+# Developer guide
+
+Operations and release documentation for MintMaker maintainers. For development setup and commands, see [contributing.md](contributing.md) and [architecture.md](architecture.md). For automated release (and more information about the release process), see [automated-release-workflow.md](automated-release-workflow.md).
 
 ## On-demand runs in the stage environment
-This trick might be useful during the development phase. In case you want to
-check if your changes are working, before submitting a PR and having it merged
-then automatically built by Konflux, it will be useful to have these on-demand
-runs. This is not a mandatory step, so feel free to skip it.
 
-Follow these steps to make an on-demand run in the stage environment:
-- login to one of the stage clusters listed in the Konflux Link page (use RH SSO)
-    - if you prefer to use the cli, you can use the 'Get Token' buttons in that
-    page, or go through the familiar route in the UI after logging in
-- manually build and push your new image to Quay (or your preferred image repository)
-- get the yaml of the renovate-job that was last run in in Konflux's
-- change its 'image' field and point to your repo/image
-- optional (but encouraged during development): set renovate's dry run parameter
-  to `full`, in case you don't want to create PRs in the stage repositories:
-```yaml
-    env:
-    - name: LOG_LEVEL
-        value: debug
-    - name: RENOVATE_DRY_RUN
-        value: 'full'
-```
-- manually create the job, let it run and check the logs for any error
-    - if you are using the UI, you can click on the "+" button on the top right,
-    paste your yaml in the window that will appear, then clicking on 'Create'
-    - if you prefer using the cli, you can use `oc create -f <path to your yaml file>` 
+Use this when you want to validate changes **before** merging a PR. This step is optional.
 
-Creating a job in this manner will make it run immediatelly, so you don't
-need to wait until the next cronjob-invoked run. If you need to make another
-run, simply delete the job and then recreate it (demanding another run to the
-same job might not be possible from the UI):
-- to delete your job via the UI: navigate to your job's page, then under the
-  'Actions' dropdown, select 'Delete Job'
-    - if you don't have a 'Jobs' tab in your interface, you can go to Search > 
-    check 'Jobs' in the 'Resources' dropdown > select 'Name' in the filter
-    dropdown, then enter the beginning of your job name > sort results by
-    creation date > click on the latest job
-- to delete it via the cli, use `oc delete job <your job name>`
+### Steps
+
+1. Log in to a Konflux **stage** cluster ([Konflux Clusters page](https://konflux.pages.redhat.com/konflux-portal/developer/konflux-clusters.html), RH SSO). For CLI access, use **Get Token** on that page or the OpenShift console after SSO login.
+2. Build and push your controller image to Quay (or another registry you can pull from).
+3. Find the YAML of the last **renovate-job** PipelineRun (or Job) in the `mintmaker` namespace and copy it.
+4. Set the `image` field to your test image.
+5. (Recommended) Enable Renovate dry-run so stage repos do not get real PRs:
+
+   ```yaml
+   env:
+     - name: LOG_LEVEL
+       value: debug
+     - name: RENOVATE_DRY_RUN
+       value: "full"
+   ```
+
+6. Create the job:
+   - **UI**: **+** (top right corner) → Import YAML → paste YAML content into the window → **Create**
+   - **CLI**: `oc create -f <path-to-yaml>`
+
+The job runs immediately instead of waiting for CronJob schedule. To run again, **delete** the job and recreate it (re-running the same job from the UI may not always work).
+
+### Delete a test job
+
+- **UI**: Job page → **Actions** → **Delete Job**
+  (If there is no Jobs tab: **Search** → resource type **Jobs** → filter by name → sort by creation time → open latest)
+- **CLI**: `oc delete job <job-name>`
 
 ## Release process
 
 > [!NOTE]
-> The release process is also automated. Please refer to the
-[automated-release-workflow](automated-release-workflow.md) for more details.
+> Releases are **automated**. See [automated-release-workflow.md](automated-release-workflow.md) for more details.
 >
-> The following text describes the manual release process, which can
-> still occasionally be helpful.
+> The sections below describe the **manual** process, which is still useful for troubleshooting or exceptional releases.
 
-In this section we will describe the steps to make a release. We will see each
-step separately in detail, and also provide a checklist by the end.
+### Types of changes
 
-### Propose and merge your changes
+| Change type | Repository | After merge |
+|-------------|------------|-------------|
+| Controller code | [mintmaker](https://github.com/konflux-ci/mintmaker) (this repo) | Konflux builds controller image → auto PR to infra-deployments (dev/staging) |
+| Renovate image | [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image) | Konflux builds image → auto PR updates staging Renovate image tag |
+| Renovate config only | `config/renovate/` in this repo | No image build; update config ref in infra-deployments (can skip to [stage run](#stage-run-to-check-the-new-build)) |
 
-Changes to the MintMaker project fall into one of these three categories:
-- changes to the controller code (this repo)
-- changes to the custom image used by MintMaker
-- changes to the configuration file
+### Propose and merge changes
 
-Propose your changes as usual, get your reviews and finally merge them. In the
-first two cases, the automatic build in Konflux will be triggered when your
-changes are merged into the main branch, and the next step will be to wait for
-them to finish.
+Open PRs as usual, get review and wait for the automatic CI pipelines to pass.
 
-If you are making routine changes for the weekly release and believe no reviews
-are necessary, you can skip the reviews (e.g., the changes are simply konflux
-reference udpates).
+Konflux build status:
 
-In case you are making changes only to the configuration file, you can skip to
-the [stage run step](./developer.md#stage-run-to-check-the-new-build).
+- GitHub **Actions** tab or PR checks after merge
+- Pipeline name is often referenced as **`mintmaker-on-pull-request`**.
 
-### Wait until Konflux automatic build finishes
+Images are pushed to Quay with tags including the git commit SHA.
 
-The status of the Konflux build job can be checked in github via the 'Actions'
-tab, or in the PR checks after the merge event. The build job is called
-`mintmaker-on-pull-request`.
+To promote to **staging**, merge the PR that Konflux opens in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) after the build completes. Look for a PR named `mitnmaker update`. If no PR is opened automatically, open one. Example PR updating the controller image in stage: [infra-deployments#11886](https://github.com/redhat-appstudio/infra-deployments/pull/11886).
 
-When it is finished, Konflux will push the new image to Quay, so you can watch
-it to check when the job is done as well. Images are labelled with the git commit
-sha, so you can use that to identify which image corresponds to which commit.
+To promote mintmaker from stage to production, look for a PR named `Promoting component mintmaker from stage to prod` (always check the **Files changed** tab, if the PR contains the correct SHA tags). Never update production with tags which have not been tested in staging. If no PR is opened, open one. Example PR updating the production image SHAs: [infra-deployments#11921](https://github.com/redhat-appstudio/infra-deployments/pull/11921).
 
-To promote an image to stage, you need to merge the MR that is automatically
-created in infra-deployments after the Konflux build finishes.
+To merge the PRs in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments), a `lgtm` and `approve` labels need to be added to the PR. This is done by adding a comment to the PR (author of the PR can not add the labels):
 
+```txt
+/lgtm
+/approve
+```
+
+> [!WARNING]
+> Confirm every image tag in the PR exists in Quay. A failed build can leave tags missing and cause `ImagePullBackOff`.
 
 ### Stage run to check the new build
 
-After the new image is built and pushed, wait until the next run and allow the
-staging environment to pick up the new image. The **Staging** environment uses
-the `latest` tag of [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image/),
-referenced in [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/staging/base/manager_patches.yaml).
-The PRs for this environment are created automatically.
+1. Wait for the next scheduled MintMaker run **or** use [on-demand runs](#on-demand-runs-in-the-stage-environment) with the image Konflux built.
+2. Check PipelineRun / pod logs for errors.
+3. Confirm pod `image` (or image ID) matches your expected commit SHA.
 
-Since the `latest` tag is dynamic, be mindful to check the image that is being
-used in the run, to avoid headaches.
+### Check production deployment
 
-After the next MintMaker run starts, allow it to finish and check the logs. You
-can also watch them during the run.
+1. [Konflux Clusters](https://konflux.pages.redhat.com/konflux-portal/developer/konflux-clusters.html) → production cluster → OpenShift (SSO) → namespace **`mintmaker`**.
+2. Confirm `mintmaker-controller-manager-*` pod is **Running**.
+3. After the next production Renovate run, check job logs and that Renovate pods use the expected image digest.
 
-Check also that the pods used the correct image: look up the `image` field in
-the pod yamls, and check that it has the digest sha corresponding to your commit.
+### Checklist (manual release)
 
-In case you are making an update to the rpm-lockfile prototype, you can check
-the PRs in [this test repository](https://github.com/staticf0x/mintmaker-test/).
-This repository has only `.tekton` files and a RPM file, and you can check if
-there aren't any regressions with the prototype.
+### Deploy to production
 
-If you do not wish to wait until the next automatic run, you can use the trick
-explained before to make an on-demand run. Be sure to use the image built by Konflux.
+- [ ] Open and merge PR(s) with changes in MintMaker repositories
+- [ ] Wait for Konflux build → image on [Quay](https://quay.io/konflux-ci/mintmaker).
+- [ ] Release to stage: Comment on the automatically opened infra-deployments staging PR, or open a PR updating SHA tags (example: [infra-deployments#11886](https://github.com/redhat-appstudio/infra-deployments/pull/11886)).
+- [ ] Verify in stage: Wait for scheduled run or [on-demand run](#on-demand-runs-in-the-stage-environment) with Konflux-built image. Check pod images and logs in stage.
+- [ ] Optional: check [mintmaker-test](https://github.com/staticf0x/mintmaker-test/) for RPM prototype regressions
+- [ ] Deploy to production: Comment on the automatically opened infra-deployments production PR, or open a PR updating SHA tags (example: [infra-deployments#11921](https://github.com/redhat-appstudio/infra-deployments/pull/11921))
 
+### After production deploy
 
-### Make a change request to infra-deployments to push the new build to production
-
-MintMaker is released to Konflux through the [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
-repository. The **Production** environment uses a fixed tag and commit for the
-configuration. This is safer, and we can be sure of which image is being used at
-any given time.
-
-When proceeding to create the change requests described next, change the values
-to the same ones as in the stage environment. Failing to do thiis might void
-the validation in the stage environment.
-
-In order to release MintMaker to *production*, create a PR in [infra-deployments](https://github.com/redhat-appstudio/infra-deployments)
-with the following changes:
-
-In [kustomization.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/production/base/kustomization.yaml):
-
-- If there was a change to the [default MintMaker config](https://github.com/konflux-ci/mintmaker/blob/main/config/renovate/renovate.json),
-  modify the git commit hashes in `resources` to reflect that.
-- If there was a change to the [MintMaker controller](https://github.com/konflux-ci/mintmaker)
-  (this repository), change the container image tag in `images.newTag` property.
-  This needs to be a valid and existing tag available in the Quay repository.
-
-In [manager_patches.yaml](https://github.com/redhat-appstudio/infra-deployments/blob/main/components/mintmaker/production/base/manager_patches.yaml):
-
-- If there was a change to [mintmaker-renovate-image](https://github.com/konflux-ci/mintmaker-renovate-image/),
-  change the container image tag.
-
-> [!WARNING]
-> Always check the image tag(s) you propose in the PR actually exist
-> in the Quay repositories. It is possible (however unlikely) that the build
-> pipeline fails to build or push the image to the registry. This would
-> result in the pods not being able to start up in Konflux.
-
-Don't forget to ask review from the code owners to get it merged. After the PR 
-is approved and merged, the deployment will start automatically.
-
-> [!IMPORTANT]
-> During the release process, please make sure to actively monitor at least
-> one cluster's `mintmaker` namespace for any issues, most often it would
-> be a `ImagePullBackOff` error for the controller pod, if anything went wrong.
-
-
-### Check the deployment to production
-
-The first thing to check is if the controller is running without any problems.
-You can go to the Konflux Link page choose any production cluster (don't forget 
-to switch to the mintmaker namespace),
-and then:
-- click on Openshift
-- login via SSO
-- make sure you are in the `mintmaker` namespace (use the 'Project' dropdown to
-  select it)
-- navigate to the 'Pods' view
-- check that the pod `mintmaker-controller-manager-<hash id>` is running
-    - if you don't have a 'Pods' tab on the left-most menu, go to Search > check
-    'Pods' in the 'Resources' dropdown > select 'Name' in the filter dropdown,
-    then start typing the controller pod's name, and sort the results by
-    creation date; finally click on the latest job
-
-After checking the controller, wait until the next prod run and monitor the
-logs, or wait until the jobs are done and check the full logs. Also check the
-image used in the renovate jobs: go to a pod yaml, and check if the `image`
-field points to the correct image in Quay.
-
-
-### Checklist
-
-Deploying to production:
-- open PR(s) with your changes
-- ask for reviews, address suggestions, then get the changes merged
-- wait until Konflux builds the new image and pushes it to [Quay](https://quay.io/repository/konflux-ci/mintmaker-renovate-image)
-- stage run: wait until the next cronjob-invoked run and allow the stage
-environment to pick it up; alternatively, use the trick explained before to make
-an on-demand run
-    - if making an on-demand run, be sure to use the image built by Konflux
-    - check that the pods used the correct image (see `image` field in the pod
-    yamls)
-    - allow for the stage runs to finish and check the logs; you can also watch
-    them during the run
-    - in case you are making an update to the rpm-lockfile prototype, you can
-    check the PRs in [the test repo](https://github.com/staticf0x/mintmaker-test/)
-- update the image hash used in prod in the [infra-deployments repo](https://github.com/redhat-appstudio/infra-deployments)
-    - example PR: https://github.com/redhat-appstudio/infra-deployments/pull/4432
-
-Checking the deployment:
-- check if the controller is running without issues
-- wait until the next prod run and monitor the logs
-- check the image used in the renovate jobs
+- [ ] Controller pod healthy in `mintmaker`
+- [ ] Next prod Renovate run logs clean
+- [ ] Renovate job pods use expected image
