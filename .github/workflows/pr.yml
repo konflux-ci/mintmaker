@@ -115,3 +115,20 @@ jobs:
           version: v0.7.6
           directory: config
           config: .kube-linter.yaml
+
+  agent:
+    name: Agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Check length of AGENTS.md (max 300 lines)
+        run: |
+          set -euo pipefail
+          lines=$(wc -l < AGENTS.md)
+          echo "AGENTS.md line count: ${lines}"
+          if [ "${lines}" -gt 300 ]; then
+            echo "::warning file=AGENTS.md::AGENTS.md has ${lines} lines (max 300)."
+            exit 1
+          fi

@@ -1,0 +1,62 @@
+# See https://pre-commit.com for more information
+repos:
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.json]
+
+  - repo: local
+    hooks:
+      - id: agents-md-max-lines
+        name: AGENTS.md at most 300 lines
+        entry: bash -c 'lines=$(wc -l < AGENTS.md); if [ "$lines" -gt 300 ]; then echo "AGENTS.md has $lines lines (max 300)"; exit 1; fi'
+        language: system
+        files: ^AGENTS\.md$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: make-fmt
+        name: make fmt
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            make fmt
+            staged=$(git diff --cached --name-only --diff-filter=ACMR)
+            if [ -n "$staged" ] && ! git diff --quiet -- $staged; then
+              echo 'make fmt changed staged files. Run make fmt and git add them.'
+              git --no-pager diff -- $staged
+              exit 1
+            fi
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: make-generate-manifests
+        name: make generate manifests
+        entry: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            make generate manifests
+            staged=$(git diff --cached --name-only --diff-filter=ACMR)
+            if [ -n "$staged" ] && ! git diff --quiet -- $staged; then
+              echo 'make generate manifests changed staged files. Run make generate manifests and git add them.'
+              git --no-pager diff -- $staged
+              exit 1
+            fi
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: make-test-build
+        name: make test build
+        entry: make
+        args: [test, build]
+        language: system
+        pass_filenames: false
+        always_run: true
