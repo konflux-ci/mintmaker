@@ -1,0 +1,12 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: DependencyUpdateCheck
+metadata:
+  name: test-dependency-check
+  namespace: mintmaker
+spec:
+  namespaces:
+  - namespace: test-app
+    applications:
+    - application: test-application
+      components:
+      - test-backend
