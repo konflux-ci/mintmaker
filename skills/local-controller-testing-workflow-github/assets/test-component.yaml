@@ -1,0 +1,13 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  name: test-backend
+  namespace: test-app
+spec:
+  componentName: test-backend
+  application: test-application
+  source:
+    git:
+      url: https://github.com/user/repo-name.git
+      revision: main
+      context: .
