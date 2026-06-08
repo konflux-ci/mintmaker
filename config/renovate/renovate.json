@@ -135,7 +135,7 @@
         "branchPrefix": "konflux/references-replacement/",
         "groupName": "Konflux references replacement",
         "group": {
-          "commitMessageTopic": "redhat-appstudio-tekton-catalog references",
+          "commitMessageTopic": "{{depName}} references",
           "commitMessageExtra": "",
           "commitBody": "redhat-appstudio-tekton-catalog is deprecated, replace the references\nwith equivalent konflux-ci/tekton-catalog references"
         }
