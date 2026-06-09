@@ -23,6 +23,8 @@
   "vulnerabilityAlerts": {
     "enabled": true
   },
+  "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "additionalBranchPrefix": "{{baseBranch}}/",
   "branchPrefix": "konflux/mintmaker/",
   "enabledManagers": [
