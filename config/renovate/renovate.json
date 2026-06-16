@@ -25,6 +25,7 @@
   },
   "minimumReleaseAge": "3 days",
   "minimumReleaseAgeBehaviour": "timestamp-optional",
+  "prCreation": "not-pending",
   "additionalBranchPrefix": "{{baseBranch}}/",
   "branchPrefix": "konflux/mintmaker/",
   "enabledManagers": [
