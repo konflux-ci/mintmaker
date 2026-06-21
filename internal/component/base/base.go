@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,11 +29,6 @@ import (
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
 
 	bslices "github.com/konflux-ci/mintmaker/internal/slices"
-)
-
-var (
-	renovateBaseConfig      map[string]interface{}
-	renovateBaseConfigMutex sync.RWMutex
 )
 
 type BaseComponent struct {
@@ -128,14 +122,12 @@ func (c *BaseComponent) GetHostRules(ctx context.Context, registrySecret *corev1
 	return hostRules, nil
 }
 
+// GetRenovateBaseConfig reads the renovate-config ConfigMap fresh on every call.
+// The ConfigMap is fetched with an uncached client, so a change to it takes
+// effect on the next call without requiring a controller restart. It must not be
+// cached: a process-lifetime cache silently propagates stale config (e.g. a
+// changed GOPROXY) into every generated config.js until the pod is restarted.
 func (c *BaseComponent) GetRenovateBaseConfig(ctx context.Context, client client.Client) (map[string]interface{}, error) {
-	renovateBaseConfigMutex.RLock()
-	if renovateBaseConfig != nil {
-		defer renovateBaseConfigMutex.RUnlock()
-		return renovateBaseConfig, nil
-	}
-	renovateBaseConfigMutex.RUnlock()
-
 	baseConfig := corev1.ConfigMap{}
 	configmapKey := types.NamespacedName{Namespace: "mintmaker", Name: "renovate-config"}
 	if err := client.Get(ctx, configmapKey, &baseConfig); err != nil {
@@ -155,9 +147,6 @@ func (c *BaseComponent) GetRenovateBaseConfig(ctx context.Context, client client
 		config[k] = v
 	}
 
-	renovateBaseConfigMutex.Lock()
-	renovateBaseConfig = config
-	renovateBaseConfigMutex.Unlock()
 	return config, nil
 }
 
