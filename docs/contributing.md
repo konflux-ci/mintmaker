@@ -89,12 +89,12 @@ make docker-build docker-push IMG=<registry>/mintmaker:<tag>
 make test-e2e
 ```
 
-CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) also runs: `go mod tidy` check, `make fmt`, `make generate manifests`, RBAC wildcard check, `make test`, `make build`, kube-linter on `config/`.
+CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) runs the `Lint` job first (go mod tidy, `make fmt`, `make generate manifests`, RBAC wildcard check, `make lint`, markdownlint, kube-linter), then `Test Go` (`make test`, `make build`, Codecov) only after lint passes. The `Agent` job checks AGENTS.md line count in parallel.
 
 ## Before opening a pull request
 
 ```sh
-make fmt generate manifests test build
+make fmt generate manifests lint test build
 ```
 
 We welcome contributions via pull requests and issues. Maintainers: [.github/CODEOWNERS](../.github/CODEOWNERS) (`@konflux-ci/mintmaker-maintainers`).

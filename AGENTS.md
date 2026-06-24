@@ -18,6 +18,7 @@ Run from the repository root. See `make help` for every target.
 | ------- | ------------ |
 | `make fmt` | Runs `go fmt ./...` on all packages. CI fails if code is not formatted. |
 | `make vet` | Runs `go vet ./...` for static analysis. |
+| `make lint` | Runs `golangci-lint` using the `.golangci.yaml` config file on the repository. |
 | `make generate` | Regenerates DeepCopy methods (`controller-gen object`); needed after API type changes. Output includes `zz_generated.deepcopy.go` files — do not edit. |
 | `make manifests` | Regenerates CRD YAML under `config/crd/bases/` and RBAC under `config/rbac/` from kubebuilder markers and API types — do not edit generated YAML files. |
 | `make test` | Runs `manifests`, `generate`, `fmt`, `vet`, then unit and integration tests with **envtest** (downloads kubebuilder assets for `ENVTEST_K8S_VERSION` in the Makefile). Produces `cover.out`. |
@@ -31,7 +32,7 @@ Run from the repository root. See `make help` for every target.
 ## Conventions
 
 - **Edits**: Match existing patterns in the package you edit (Apache 2.0 headers, logging, naming of variables); minimize diff scope.
-- **Formatting**: Keep Go gofmt clean (`go fmt ./...`); for Markdown, respect `markdownlint` (see `.markdownlint.json`).
+- **Formatting**: Keep Go gofmt clean (`go fmt ./...`); for Markdown, respect `markdownlint` (see `.markdownlint.json`). Keep `golangci-lint` clean (run `make lint` after changes).
 - **Tests**: Add or update `*_test.go` alongside any new behavior or behavior change. Run `make test` before committing.
 - **Test style**: Follow the style used in the edited package. If the package has a `suite_test.go`, add Ginkgo/Gomega specs in separate `*_test.go` files (keep `suite_test.go` as runner/shared setup). Otherwise use standard Go table-driven tests.
 - **API / CRD changes**: After edits under `api/v1alpha1/`, run `make generate manifests` and commit generated DeepCopy, CRD (`config/crd/bases/`), and RBAC YAML. Never edit those files.

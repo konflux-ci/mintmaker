@@ -4,6 +4,8 @@ repos:
     rev: v0.49.0
     hooks:
       - id: markdownlint
+        # ava@8 (dev dep of markdownlint-cli) rejects Node 25; pin an LTS version.
+        language_version: 24.12.0
         args: [--config, .markdownlint.json]
 
   - repo: local
@@ -14,6 +16,16 @@ repos:
         language: system
         files: ^AGENTS\.md$
         pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: make-lint
+        name: make lint
+        entry: make
+        args: [lint]
+        language: system
+        pass_filenames: false
+        always_run: true
 
   - repo: local
     hooks:

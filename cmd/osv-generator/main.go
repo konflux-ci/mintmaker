@@ -31,7 +31,7 @@ func main() {
 	days := flag.Int("days", 120, "Only advisories created in the last X days are included")
 
 	flag.Parse()
-	err := os.MkdirAll(*destDir, 0755)
+	err := os.MkdirAll(*destDir, 0755) //nolint:gosec // need "other" permissions for the downloader to work
 	if err != nil {
 		fmt.Println("failed to create destination path: ", err)
 		os.Exit(1)
@@ -43,12 +43,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	osv_generator.GenerateOSV(filepath.Join(*destDir, *containerFilename), true, *days)
+	err = osv_generator.GenerateOSV(filepath.Join(*destDir, *containerFilename), true, *days)
 	if err != nil {
 		fmt.Println("Generating the container OSV database has failed: ", err)
 		os.Exit(1)
 	}
-	osv_generator.GenerateOSV(filepath.Join(*destDir, *rpmFilename), false, *days)
+	err = osv_generator.GenerateOSV(filepath.Join(*destDir, *rpmFilename), false, *days)
 	if err != nil {
 		fmt.Println("Generating the RPM OSV database has failed: ", err)
 		os.Exit(1)

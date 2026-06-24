@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
@@ -157,7 +157,7 @@ func (c *Component) lookupSecret() (*corev1.Secret, error) {
 		componentRepoParts := strings.Split(c.Repository, "/")
 
 		// find wildcard repositories
-		wildcardRepos := slices.Filter(nil, secretRepositories, func(s string) bool { return strings.HasSuffix(s, "*") })
+		wildcardRepos := bslices.Filter(secretRepositories, func(s string) bool { return strings.HasSuffix(s, "*") })
 
 		for _, repo := range wildcardRepos {
 			i := bslices.Intersection(componentRepoParts, strings.Split(strings.TrimSuffix(repo, "*"), "/"))

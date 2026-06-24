@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -41,7 +40,7 @@ import (
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/config"
-	. "github.com/konflux-ci/mintmaker/internal/constant"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/metrics"
 	"github.com/konflux-ci/mintmaker/internal/tekton"
 	"github.com/konflux-ci/mintmaker/internal/utils"
@@ -56,7 +55,7 @@ type DependencyUpdateCheckReconciler struct {
 	NewGitComponent component.GitComponentFactory
 }
 
-func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, eventRecorder record.EventRecorder, newGitComponent component.GitComponentFactory) *DependencyUpdateCheckReconciler {
+func NewDependencyUpdateCheckReconciler(client client.Client, scheme *runtime.Scheme, newGitComponent component.GitComponentFactory) *DependencyUpdateCheckReconciler {
 	return &DependencyUpdateCheckReconciler{
 		Client:          client,
 		Scheme:          scheme,
@@ -71,7 +70,7 @@ func (r *DependencyUpdateCheckReconciler) getCAConfigMap(ctx context.Context) (*
 	configMapList := &corev1.ConfigMapList{}
 	labelSelector := client.MatchingLabels{"config.openshift.io/inject-trusted-cabundle": "true"}
 	listOptions := []client.ListOption{
-		client.InNamespace(MintMakerNamespaceName),
+		client.InNamespace(mmconst.MintMakerNamespaceName),
 		labelSelector,
 	}
 	err := r.Client.List(ctx, configMapList, listOptions...)
@@ -165,9 +164,9 @@ func (r *DependencyUpdateCheckReconciler) hasActivePipelineRun(ctx context.Conte
 
 	pipelineRuns := &tektonv1.PipelineRunList{}
 	listOpts := []client.ListOption{
-		client.InNamespace(MintMakerNamespaceName),
+		client.InNamespace(mmconst.MintMakerNamespaceName),
 		client.MatchingLabels{
-			MintMakerRepoBranchHashLabel: utils.RepoBranchHash(host, repository, branch),
+			mmconst.MintMakerRepoBranchHashLabel: utils.RepoBranchHash(host, repository, branch),
 		},
 	}
 
@@ -208,8 +207,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	defer func() {
 		if len(resources) > 0 {
 			for _, resource := range resources {
-				// Ignore error
-				r.Client.Delete(ctx, resource)
+				_ = r.Client.Delete(ctx, resource)
 			}
 		}
 	}()
@@ -218,7 +216,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	renovateSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: MintMakerNamespaceName,
+			Namespace: mmconst.MintMakerNamespaceName,
 		},
 		Type:       corev1.SecretTypeOpaque,
 		StringData: map[string]string{},
@@ -263,7 +261,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	renovateConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: MintMakerNamespaceName,
+			Namespace: mmconst.MintMakerNamespaceName,
 		},
 		Data: map[string]string{
 			"config.js": renovateJsConfig,
@@ -284,7 +282,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 		rpmSecret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name + "-rpm-key",
-				Namespace: MintMakerNamespaceName,
+				Namespace: mmconst.MintMakerNamespaceName,
 			},
 			Type: corev1.SecretTypeOpaque,
 			StringData: map[string]string{
@@ -300,7 +298,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 
 	// Creating the pipelineRun definition
-	builder := tekton.NewPipelineRunBuilder(name, MintMakerNamespaceName).
+	builder := tekton.NewPipelineRunBuilder(name, mmconst.MintMakerNamespaceName).
 		WithLabels(map[string]string{
 			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
 			"mintmaker.appstudio.redhat.com/component":    comp.GetName(),
@@ -309,7 +307,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
 			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
 			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(currentBranch),
-			MintMakerRepoBranchHashLabel:                  utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
+			mmconst.MintMakerRepoBranchHashLabel:          utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -362,7 +360,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			},
 		}
 		caConfigMapOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-		builder.WithConfigMap(caConfigMap.ObjectMeta.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
+		builder.WithConfigMap(caConfigMap.Name, "/etc/pki/ca-trust/extracted/pem", caConfigMapItems, caConfigMapOpts)
 	}
 
 	if _, exists := renovateSecret.Data[corev1.DockerConfigJsonKey]; exists {
@@ -373,7 +371,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 			},
 		}
 		secretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
-		builder.WithSecret(renovateSecret.ObjectMeta.Name, "/home/renovate/.docker", secretItems, secretOpts)
+		builder.WithSecret(renovateSecret.Name, "/home/renovate/.docker", secretItems, secretOpts)
 	}
 
 	// Add Kite integration if enabled AND token is available
@@ -478,7 +476,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	// If the DependencyUpdateCheck has been handled before, skip it
-	if value, exists := dependencyupdatecheck.Annotations[MintMakerProcessedAnnotationName]; exists && value == "true" {
+	if value, exists := dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationName]; exists && value == "true" {
 		log.Info(fmt.Sprintf("DependencyUpdateCheck has been processed: %v", req.NamespacedName))
 		return ctrl.Result{}, nil
 	}
@@ -493,7 +491,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	if dependencyupdatecheck.Annotations == nil {
 		dependencyupdatecheck.Annotations = map[string]string{}
 	}
-	dependencyupdatecheck.Annotations[MintMakerProcessedAnnotationName] = "true"
+	dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationName] = "true"
 
 	err = r.Client.Update(ctx, dependencyupdatecheck)
 	if err != nil {
@@ -523,7 +521,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	// Filter out components which have mintmaker disabled
 	componentList := []appstudiov1alpha1.Component{}
 	for _, component := range gatheredComponents {
-		if value, exists := component.Annotations[MintMakerDisabledAnnotationName]; !exists || value != "true" {
+		if value, exists := component.Annotations[mmconst.MintMakerDisabledAnnotationName]; !exists || value != "true" {
 			componentList = append(componentList, component)
 		}
 	}
@@ -539,8 +537,8 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	if cfg := config.Get(); cfg.Kite.Enabled {
 		secretList := &corev1.SecretList{}
 		err := r.Client.List(ctx, secretList,
-			client.InNamespace(MintMakerNamespaceName),
-			client.MatchingLabels{KiteTokenSecretLabel: "true"},
+			client.InNamespace(mmconst.MintMakerNamespaceName),
+			client.MatchingLabels{mmconst.KiteTokenSecretLabel: "true"},
 		)
 		if err != nil {
 			log.Error(err, "Kite token secret lookup failed - skipping Kite integration")

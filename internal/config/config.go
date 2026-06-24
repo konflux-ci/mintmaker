@@ -141,7 +141,7 @@ func defaultConfig() *Config {
 func load(path string) *Config {
 	log := ctrllog.Log.WithName("config")
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is the operator configuration file location
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Info("config file not found, using defaults", "path", path)

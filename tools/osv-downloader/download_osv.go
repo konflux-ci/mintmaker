@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/go-github/v82/github"
 )
@@ -45,17 +46,17 @@ func DownloadOsvDb(path string) error {
 
 func downloadFile(url string, filepath string) error {
 	fmt.Println("downloading osv-offline database")
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) //nolint:gosec // URL comes from the official renovatebot GitHub release
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	out, err := os.Create(filepath)
+	out, err := os.Create(filepath) //nolint:gosec // output path is constructed by the caller
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	_, err = io.Copy(out, resp.Body)
 	return err
@@ -67,30 +68,48 @@ func unzipFile(archive_path string, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer archive.Close()
+	defer func() { _ = archive.Close() }()
 
+	destination = filepath.Clean(destination)
 	for _, file := range archive.File {
-		filePath := filepath.Join(destination, file.Name)
+		filePath := filepath.Join(destination, file.Name) //nolint:gosec // zip entry paths are validated below
+		cleanPath := filepath.Clean(filePath)
+		// Guard against zip slip: reject entries whose resolved path escapes destination
+		// after Join+Clean, e.g. "../../etc/passwd" with destination "/tmp/osv-db" resolves
+		// to "/etc/passwd", which is not under "/tmp/osv-db/".
+		if !strings.HasPrefix(cleanPath, destination+string(os.PathSeparator)) && cleanPath != destination {
+			return fmt.Errorf("invalid file path in archive: %s", file.Name)
+		}
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(filePath, os.ModePerm)
+			if err := os.MkdirAll(filePath, 0755); err != nil { //nolint:gosec // need "other" permissions for Tekton prepare-db step
+				return err
+			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil { //nolint:gosec // need "other" permissions for Tekton prepare-db step
 			return err
 		}
-		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode()) //nolint:gosec // path validated above
 		if err != nil {
 			return err
 		}
 		fileInArchive, err := file.Open()
 		if err != nil {
+			_ = destFile.Close()
 			return err
 		}
-		if _, err := io.Copy(destFile, fileInArchive); err != nil {
+		if _, err := io.Copy(destFile, fileInArchive); err != nil { //nolint:gosec // archive is from the official renovatebot release
+			_ = destFile.Close()
+			_ = fileInArchive.Close()
 			return err
 		}
-		defer destFile.Close()
-		defer fileInArchive.Close()
+		if err := destFile.Close(); err != nil {
+			_ = fileInArchive.Close()
+			return err
+		}
+		if err := fileInArchive.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

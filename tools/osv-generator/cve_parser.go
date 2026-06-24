@@ -31,18 +31,18 @@ func retryGet(url string, maxRetries int, backoff time.Duration) (string, error)
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) //nolint:gosec,noctx // URL points to Red Hat security advisory data
 		if err == nil && resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return "", fmt.Errorf("could not read response body: %w", err)
+			body, readErr := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if readErr != nil {
+				return "", fmt.Errorf("could not read response body: %w", readErr)
 			}
 			return string(body), nil
 		}
 
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		lastErr = err
 
@@ -120,11 +120,11 @@ func ConvertToOSV(vexData VEX, containerVulns bool) []OSV {
 
 // Save all CVEs to an OSV file
 func StoreToFile(filename string, convertedVulnerabilities []OSV) error {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644) //nolint:gosec // output path is provided by the caller, needs "other" permissions
 	if err != nil {
 		return fmt.Errorf("error accessing file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	encoder := json.NewEncoder(file)
 
 	for _, v := range convertedVulnerabilities {
