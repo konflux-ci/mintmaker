@@ -19,6 +19,8 @@ Run from the repository root. See `make help` for every target.
 | `make fmt` | Runs `go fmt ./...` on all packages. CI fails if code is not formatted. |
 | `make vet` | Runs `go vet ./...` for static analysis. |
 | `make lint` | Runs `golangci-lint` using the `.golangci.yaml` config file on the repository. |
+| `make shellcheck` | Extracts Tekton `Script:` strings from `pipeline_run_builder.go` and runs `shellcheck` (see `hack/shellcheck-embedded-tekton-scripts/README.md`). |
+| `make actionlint` | Lints `.github/workflows/` (including inline `run:` shell when `shellcheck` is installed). |
 | `make generate` | Regenerates DeepCopy methods (`controller-gen object`); needed after API type changes. Output includes `zz_generated.deepcopy.go` files — do not edit. |
 | `make manifests` | Regenerates CRD YAML under `config/crd/bases/` and RBAC under `config/rbac/` from kubebuilder markers and API types — do not edit generated YAML files. |
 | `make test` | Runs `manifests`, `generate`, `fmt`, `vet`, then unit and integration tests with **envtest** (downloads kubebuilder assets for `ENVTEST_K8S_VERSION` in the Makefile). Produces `cover.out`. |
@@ -42,6 +44,7 @@ Run from the repository root. See `make help` for every target.
 - **Uncached API reads**: Secrets, ServiceAccounts, ConfigMaps, Pods, and Konflux `Component`s are fetched without cache — avoid broadening list calls when touching the client.
 - **Git platforms**: Add new platform in `internal/component/<platform>/` (detection: `internal/utils/utils.go`, `GetGitPlatform`). Implement all the functionality that the already supported platforms have (GitHub, GitLab, Forgejo).
 - **Renovate config**: Global rules under `config/renovate/`. These can be changed. File `.github/renovate.json` is configuration for when Renovate runs on this repo. Avoid changing this file unless instructed otherwise.
+- **Tekton step scripts**: Embedded in `internal/tekton/pipeline_run_builder.go`; run `make shellcheck` after edits (see `hack/shellcheck-embedded-tekton-scripts/README.md`).
 - **Imports**: Order stdlib, external libraries, then `github.com/konflux-ci/mintmaker/...`.
 - **External libraries**: Add new external libraries only when completely necessary. Run `go mod tidy` whenever dependencies are added, removed, or upgraded. Include resulting `go.mod` and `go.sum` in the commit.
 - **Logging**: Use controller-runtime `log` from context with structured keys (`component`, `namespace`, `repository`).

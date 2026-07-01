@@ -13,6 +13,8 @@ Match CI and the Makefile:
 | kubectl            | Compatible with your cluster                                                                        |
 | Container tool     | **Podman** by default (`CONTAINER_TOOL ?= podman`); Docker works if you set `CONTAINER_TOOL=docker` |
 | make               | Standard developer workflow                                                                         |
+| shellcheck         | Optional locally; required in CI (`make shellcheck`)                                                |
+| actionlint         | Optional locally; required in CI (`make actionlint`)                                                |
 
 For local deployment you need cluster-admin or sufficient RBAC to install CRDs and deploy the manager.
 
@@ -35,6 +37,7 @@ For local deployment you need cluster-admin or sufficient RBAC to install CRDs a
 | `config/samples/`                               | Example `DependencyUpdateCheck`                                                                        |
 | `test/e2e/`                                     | Ginkgo e2e tests (excluded from default `make test`)                                                   |
 | `tools/osv-generator/`, `tools/osv-downloader/` | OSV/CVE tooling (separate from operator runtime)                                                       |
+| `hack/shellcheck-embedded-tekton-scripts/`    | CI tool: shellcheck on Tekton `Script:` strings in `pipeline_run_builder.go`                           |
 | `docs/`                                         | Documentation                                                                                          |
 
 ## Git platforms
@@ -87,14 +90,20 @@ make docker-build docker-push IMG=<registry>/mintmaker:<tag>
 
 # E2E (requires a Kubernetes cluster):
 make test-e2e
+
+# Shell linting (also run in CI; needs shellcheck and actionlint on PATH):
+make shellcheck   # Tekton Script: strings in pipeline_run_builder.go
+make actionlint   # .github/workflows/
 ```
 
-CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) runs the `Lint` job first (go mod tidy, `make fmt`, `make generate manifests`, RBAC wildcard check, `make lint`, markdownlint, kube-linter), then `Test Go` (`make test`, `make build`, Codecov) only after lint passes. The `Agent` job checks AGENTS.md line count in parallel.
+CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) runs `Lint Go and PLR shell scripts` (go mod tidy, `make fmt`, `make generate manifests`, RBAC wildcard check, `make lint`, `make shellcheck` on embedded Tekton `Script:` strings), then `Test Go` (`make test`, `make build`, Codecov) only after that job passes. In parallel: `Lint Markdown`, `Lint Kubernetes manifests`, `Lint workflows` (actionlint on `.github/workflows/`, including inline `run:` shell when shellcheck is installed), and `Agent` (AGENTS.md line count).
+
+Embedded Tekton step scripts live in `internal/tekton/pipeline_run_builder.go`; `make shellcheck` extracts and lints them without changing the source. See [hack/shellcheck-embedded-tekton-scripts/README.md](../hack/shellcheck-embedded-tekton-scripts/README.md) for skipped steps and shellcheck exclusions.
 
 ## Before opening a pull request
 
 ```sh
-make fmt generate manifests lint test build
+make fmt generate manifests lint shellcheck actionlint test build
 ```
 
 We welcome contributions via pull requests and issues. Maintainers: [.github/CODEOWNERS](../.github/CODEOWNERS) (`@konflux-ci/mintmaker-maintainers`).
