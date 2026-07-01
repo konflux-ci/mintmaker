@@ -3,6 +3,21 @@
   "extends": [
     "helpers:pinGitHubActionDigestsToSemver"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pin actionlint version in workflow install step",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/pr\\.yml$/"
+      ],
+      "matchStrings": [
+        "ACTIONLINT_VERSION:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "rhysd/actionlint",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ],
   "tekton": {
     "enabled": true,
     "automergeType": "pr",

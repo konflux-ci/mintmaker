@@ -13,6 +13,7 @@ Match CI and the Makefile:
 | kubectl            | Compatible with your cluster                                                                        |
 | Container tool     | **Podman** by default (`CONTAINER_TOOL ?= podman`); Docker works if you set `CONTAINER_TOOL=docker` |
 | make               | Standard developer workflow                                                                         |
+| actionlint         | Optional locally; required in CI (`make actionlint`)                                                |
 
 For local deployment you need cluster-admin or sufficient RBAC to install CRDs and deploy the manager.
 
@@ -87,14 +88,18 @@ make docker-build docker-push IMG=<registry>/mintmaker:<tag>
 
 # E2E (requires a Kubernetes cluster):
 make test-e2e
+
+# GH Actions workflow linting (also run in CI; needs actionlint on PATH;
+# shellcheck optional but enables inline run: shell checks):
+make actionlint   # .github/workflows/
 ```
 
-CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) runs the `Lint` job first (go mod tidy, `make fmt`, `make generate manifests`, RBAC wildcard check, `make lint`, markdownlint, kube-linter), then `Test Go` (`make test`, `make build`, Codecov) only after lint passes. The `Agent` job checks AGENTS.md line count in parallel.
+CI (`[.github/workflows/pr.yml](../.github/workflows/pr.yml)`) runs `Lint Go` (go mod tidy, `make fmt`, `make generate manifests`, RBAC wildcard check, `make lint`), then `Test Go` (`make test`, `make build`, Codecov) only after that job passes. In parallel: `Lint Markdown`, `Lint Kubernetes manifests`, `Lint workflows` (actionlint on `.github/workflows/`, including inline `run:` shell when shellcheck is installed), and `Agent` (AGENTS.md line count).
 
 ## Before opening a pull request
 
 ```sh
-make fmt generate manifests lint test build
+make fmt generate manifests lint actionlint test build
 ```
 
 We welcome contributions via pull requests and issues. Maintainers: [.github/CODEOWNERS](../.github/CODEOWNERS) (`@konflux-ci/mintmaker-maintainers`).
