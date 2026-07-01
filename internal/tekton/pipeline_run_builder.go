@@ -19,19 +19,19 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/hashicorp/go-multierror"
-	. "github.com/konflux-ci/mintmaker/internal/constant"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -99,9 +99,9 @@ func (o *MountOptions) WithOptional(optional bool) *MountOptions {
 func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 	var rootUser int64 = 0
 	var normalUser int64 = 1001120000
-	renovateImageURL := os.Getenv(RenovateImageEnvName)
+	renovateImageURL := os.Getenv(mmconst.RenovateImageEnvName)
 	if renovateImageURL == "" {
-		renovateImageURL = DefaultRenovateImageURL
+		renovateImageURL = mmconst.DefaultRenovateImageURL
 	}
 	return &PipelineRunBuilder{
 		pipelineRun: &tektonv1.PipelineRun{
@@ -264,11 +264,11 @@ func (b *PipelineRunBuilder) Build() (*tektonv1.PipelineRun, error) {
 // WithAnnotations appends or updates annotations to the PipelineRun's metadata.
 // If the PipelineRun does not have existing annotations, it initializes them before adding.
 func (b *PipelineRunBuilder) WithAnnotations(annotations map[string]string) *PipelineRunBuilder {
-	if b.pipelineRun.ObjectMeta.Annotations == nil {
-		b.pipelineRun.ObjectMeta.Annotations = make(map[string]string)
+	if b.pipelineRun.Annotations == nil {
+		b.pipelineRun.Annotations = make(map[string]string)
 	}
 	for key, value := range annotations {
-		b.pipelineRun.ObjectMeta.Annotations[key] = value
+		b.pipelineRun.Annotations[key] = value
 	}
 	return b
 }
@@ -282,11 +282,11 @@ func (b *PipelineRunBuilder) WithFinalizer(finalizer string) *PipelineRunBuilder
 // WithLabels appends or updates labels to the PipelineRun's metadata.
 // If the PipelineRun does not have existing labels, it initializes them before adding.
 func (b *PipelineRunBuilder) WithLabels(labels map[string]string) *PipelineRunBuilder {
-	if b.pipelineRun.ObjectMeta.Labels == nil {
-		b.pipelineRun.ObjectMeta.Labels = make(map[string]string)
+	if b.pipelineRun.Labels == nil {
+		b.pipelineRun.Labels = make(map[string]string)
 	}
 	for key, value := range labels {
-		b.pipelineRun.ObjectMeta.Labels[key] = value
+		b.pipelineRun.Labels[key] = value
 	}
 	return b
 }
@@ -331,8 +331,8 @@ func (b *PipelineRunBuilder) WithConfigMap(name, mountPath string, items []corev
 					},
 				},
 			}
-			b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Volumes = append(
-				b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Volumes,
+			b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Volumes = append(
+				b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Volumes,
 				volume,
 			)
 
@@ -343,8 +343,8 @@ func (b *PipelineRunBuilder) WithConfigMap(name, mountPath string, items []corev
 				ReadOnly:  *opts.ReadOnly,
 			}
 
-			for j := range b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps {
-				step := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps[j]
+			for j := range b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Steps {
+				step := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Steps[j]
 				if len(opts.StepNames) == 0 || slices.Contains(opts.StepNames, step.Name) {
 					step.VolumeMounts = append(step.VolumeMounts, volumeMount)
 				}
@@ -390,8 +390,8 @@ func (b *PipelineRunBuilder) WithSecret(name, mountPath string, items []corev1.K
 					},
 				},
 			}
-			b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Volumes = append(
-				b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Volumes,
+			b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Volumes = append(
+				b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Volumes,
 				volume,
 			)
 
@@ -402,8 +402,8 @@ func (b *PipelineRunBuilder) WithSecret(name, mountPath string, items []corev1.K
 				ReadOnly:  *opts.ReadOnly,
 			}
 
-			for j := range b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps {
-				step := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps[j]
+			for j := range b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Steps {
+				step := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Steps[j]
 				if len(opts.StepNames) == 0 || slices.Contains(opts.StepNames, step.Name) {
 					step.VolumeMounts = append(step.VolumeMounts, volumeMount)
 				}
@@ -498,7 +498,7 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 	// Find the build task and add log-analyzer step
 	for i, task := range b.pipelineRun.Spec.PipelineSpec.Tasks {
 		if task.Name == "build" && task.TaskSpec != nil {
-			steps := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.TaskSpec.Steps
+			steps := &b.pipelineRun.Spec.PipelineSpec.Tasks[i].TaskSpec.Steps
 			logAnalyzerStep := tektonv1.Step{
 				Name:   "log-analyzer",
 				Image:  "quay.io/konflux-ci/renovate-log-analyzer:latest",

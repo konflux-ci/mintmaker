@@ -20,12 +20,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -236,7 +236,7 @@ func (c *BaseComponent) GetRPMActivationKey(ctx context.Context, k8sClient clien
 		componentRepoParts := strings.Split(c.Repository, "/")
 
 		// find wildcard repositories
-		wildcardRepos := slices.Filter(nil, secretRepositories, func(s string) bool { return strings.HasSuffix(s, "*") })
+		wildcardRepos := bslices.Filter(secretRepositories, func(s string) bool { return strings.HasSuffix(s, "*") })
 
 		for _, repo := range wildcardRepos {
 			i := bslices.Intersection(componentRepoParts, strings.Split(strings.TrimSuffix(repo, "*"), "/"))

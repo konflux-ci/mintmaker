@@ -148,7 +148,7 @@ var _ = BeforeSuite(func() {
 		return newGitComponentForTest(ctx, comp, cl)
 	}
 
-	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("DependencyUpdateCheckController"), factory)).SetupWithManager(k8sManager)
+	err = (NewDependencyUpdateCheckReconciler(k8sManager.GetClient(), k8sManager.GetScheme(), factory)).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&PipelineRunReconciler{Client: k8sManager.GetClient(), Scheme: k8sManager.GetScheme()}).SetupWithManager(k8sManager)

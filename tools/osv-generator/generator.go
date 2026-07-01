@@ -29,12 +29,12 @@ const URL = "https://security.access.redhat.com/data/csaf/v2/advisories"
 // within the specified number of days from the current time. The advisory
 // filenames in releases.csv are sorted by released date, newest first.
 func getAdvisoryListByReleases(days int) ([]string, error) {
-	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "releases.csv"))
+	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "releases.csv")) //nolint:gosec,noctx // fixed Red Hat security advisory URL
 	if err != nil {
 		fmt.Println("Error downloading file:", err)
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	// Load all advisories from the document
 	csvReader := csv.NewReader(response.Body)
@@ -69,12 +69,12 @@ func getAdvisoryListByReleases(days int) ([]string, error) {
 
 // Get list of new advisories sorted by name, returns maximum of `limit` advisories
 func getAdvisoryListByModified(limit int) ([]string, error) {
-	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "changes.csv"))
+	response, err := http.Get(fmt.Sprintf("%s/%s", URL, "changes.csv")) //nolint:gosec,noctx // fixed Red Hat security advisory URL
 	if err != nil {
 		fmt.Println("Error downloading file:", err)
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	// Load all advisories from the document
 	csvReader := csv.NewReader(response.Body)

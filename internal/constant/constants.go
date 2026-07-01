@@ -22,7 +22,7 @@ const (
 	// Mintmaker can be disabled by disabled annotation in component
 	MintMakerDisabledAnnotationName = "mintmaker.appstudio.redhat.com/disabled"
 	// Label for the Kite token secret, used to find the secret in the namespace
-	KiteTokenSecretLabel = "mintmaker.appstudio.redhat.com/kite-token"
+	KiteTokenSecretLabel = "mintmaker.appstudio.redhat.com/kite-token" //nolint:gosec // label name, not a credential
 
 	// Label storing a truncated SHA256 hash of host/repository@branch.
 	// Used to find active PipelineRuns for a given repo+branch combination.

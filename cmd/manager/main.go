@@ -18,7 +18,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec // profiling enabled only on localhost when ENABLE_PROFILING=true
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -44,7 +44,7 @@ import (
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/component"
-	. "github.com/konflux-ci/mintmaker/internal/constant"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/controller"
 	mintmakermetrics "github.com/konflux-ci/mintmaker/internal/metrics"
 	// +kubebuilder:scaffold:imports
@@ -169,19 +169,19 @@ func main() {
 			ByObject: map[client.Object]cache.ByObject{
 				&mmv1alpha1.DependencyUpdateCheck{}: {
 					Namespaces: map[string]cache.Config{
-						MintMakerNamespaceName: {},
+						mmconst.MintMakerNamespaceName: {},
 					},
 					Transform: cache.TransformStripManagedFields(),
 				},
 				&corev1.Event{}: {
 					Namespaces: map[string]cache.Config{
-						MintMakerNamespaceName: {},
+						mmconst.MintMakerNamespaceName: {},
 					},
 					Transform: cache.TransformStripManagedFields(),
 				},
 				&tektonv1.PipelineRun{}: {
 					Namespaces: map[string]cache.Config{
-						MintMakerNamespaceName: {},
+						mmconst.MintMakerNamespaceName: {},
 					},
 					Transform: cache.TransformStripManagedFields(),
 				},
@@ -220,7 +220,7 @@ func main() {
 				addr = "127.0.0.1" + pprofAddr
 			}
 			setupLog.Info("starting pprof server", "address", addr)
-			if err := http.ListenAndServe(addr, nil); err != nil {
+			if err := http.ListenAndServe(addr, nil); err != nil { //nolint:gosec // localhost-only debug server gated by ENABLE_PROFILING
 				setupLog.Error(err, "pprof server failed")
 			}
 		}()

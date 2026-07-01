@@ -61,7 +61,7 @@ var _ = Describe("controller", Ordered, func() {
 			var projectimage = "example.com/mintmaker:v0.0.1"
 
 			By("building the manager(Operator) image")
-			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
+			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage)) //nolint:gosec // e2e test builds a local test image
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
@@ -75,7 +75,7 @@ var _ = Describe("controller", Ordered, func() {
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 			By("deploying the controller-manager")
-			cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage))
+			cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage)) //nolint:gosec // e2e test deploys a local test image
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
@@ -102,7 +102,7 @@ var _ = Describe("controller", Ordered, func() {
 				ExpectWithOffset(2, controllerPodName).Should(ContainSubstring("controller-manager"))
 
 				// Validate pod status
-				cmd = exec.Command("kubectl", "get",
+				cmd = exec.Command("kubectl", "get", //nolint:gosec // e2e test inspects the deployed controller pod
 					"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
 					"-n", namespace,
 				)

@@ -8,13 +8,9 @@ on:
       - synchronize
       - reopened
 jobs:
-  go:
-    name: Check sources
+  go-lint:
+    name: Lint Go
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    env:
-      OPERATOR_SDK_VERSION: v1.39.1
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -24,27 +20,6 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
-      - name: Cache Operator SDK ${{ env.OPERATOR_SDK_VERSION }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: cache-operator-sdk
-        with:
-          path: ~/cache
-          key: operator-sdk-${{ env.OPERATOR_SDK_VERSION }}
-      - name: Download Operator SDK ${{ env.OPERATOR_SDK_VERSION }}
-        if: steps.cache-operator-sdk.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/cache
-          wget https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64 -O ~/cache/operator-sdk-${OPERATOR_SDK_VERSION} > /dev/null
-          chmod +x ~/cache/operator-sdk-${OPERATOR_SDK_VERSION}
-      - name: Install Operator SDK ${{ env.OPERATOR_SDK_VERSION }}
-        run: |
-          mkdir -p ~/bin
-          cp ~/cache/operator-sdk-${OPERATOR_SDK_VERSION} ~/bin/operator-sdk
-          echo "$HOME/bin" >> $GITHUB_PATH
-      - name: Regenerate executables with current environment packages
-        run: |
-          rm -f bin/kustomize bin/controller-gen
-          make kustomize controller-gen
       - name: Cache go modules
         id: cache-mod
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -59,29 +34,29 @@ jobs:
       - name: Check go mod status
         run: |
           go mod tidy
-          if [[ ! -z $(git status ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen' -s) ]]
+          if [[ ! -z $(git status -s) ]]
           then
             echo "Go mod state is not clean:"
-            git --no-pager diff ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen'
+            git --no-pager diff
             exit 1
           fi
       - name: Check format
         run: |
           make fmt
-          if [[ ! -z $(git status ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen' -s) ]]
+          if [[ ! -z $(git status -s) ]]
           then
             echo "Some files are not properly formatted."
             echo "Please run 'make fmt' and amend your commit."
-            git --no-pager diff ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen'
+            git --no-pager diff
             exit 1
           fi
       - name: Check manifests
         run: |
           make generate manifests
-          if [[ ! -z $(git status ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen' -s) ]]
+          if [[ ! -z $(git status -s) ]]
           then
             echo "Generated sources are not up to date:"
-            git --no-pager diff ':(exclude)bin/kustomize' ':(exclude)bin/controller-gen'
+            git --no-pager diff
             exit 1
           fi
       - name: Check RBAC wildcards
@@ -90,17 +65,18 @@ jobs:
             echo "RBAC files contain wildcards (*)"
             exit 1
           fi
-      - name: Run Go Tests
-        run: make test
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
-        with:
-          use_oidc: true
-          flags: unit-tests
-          files: cover.out
-          fail_ci_if_error: false
-      - name: Ensure make build succeeds
-        run: make build
+      - name: Run golangci-lint
+        run: make lint
+
+  markdown-lint:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli@0.49.0 --config .markdownlint.json '**/*.md'
 
   kube-linter:
     name: Lint Kubernetes manifests
@@ -132,3 +108,41 @@ jobs:
             echo "::warning file=AGENTS.md::AGENTS.md has ${lines} lines (max 300)."
             exit 1
           fi
+
+  go-test:
+    name: Test Go
+    needs: go-lint
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Cache go modules
+        id: cache-mod
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Download dependencies
+        run: go mod download
+        if: steps.cache-mod.outputs.cache-hit != 'true'
+      - name: Run Go Tests
+        run: make test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        with:
+          use_oidc: true
+          flags: unit-tests
+          files: cover.out
+          fail_ci_if_error: false
+      - name: Ensure make build succeeds
+        run: make build

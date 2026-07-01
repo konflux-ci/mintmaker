@@ -262,7 +262,7 @@ func (c *Component) fetchAppInstallations() ([]AppInstallation, error) {
 	for {
 		installations, resp, err := client.Apps.ListInstallations(context.Background(), &opt.ListOptions)
 		if err != nil {
-			if resp != nil && resp.Response != nil && resp.Response.StatusCode != 0 {
+			if resp != nil && resp.Response != nil && resp.StatusCode != 0 {
 				switch resp.StatusCode {
 				case 401:
 					return nil, fmt.Errorf("GitHub Application private key does not match Application ID")

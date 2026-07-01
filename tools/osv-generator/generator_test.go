@@ -115,7 +115,7 @@ func TestGenerateOSVRPMs(t *testing.T) {
 
 	// Create a test file
 	err := GenerateOSV("testfile", false, 100000)
-	defer os.Remove("testfile")
+	defer func() { _ = os.Remove("testfile") }()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -204,7 +204,7 @@ func TestGenerateOSVContainers(t *testing.T) {
 
 	// Create a test file
 	err := GenerateOSV("testfile", true, 100000)
-	defer os.Remove("testfile")
+	defer func() { _ = os.Remove("testfile") }()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

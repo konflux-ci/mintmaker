@@ -95,7 +95,7 @@ var _ = Describe("PipelineRun builder", func() {
 		})
 
 		It("should update existing annotations and add new ones", func() {
-			builder.pipelineRun.ObjectMeta.Annotations = map[string]string{
+			builder.pipelineRun.Annotations = map[string]string{
 				"annotation1": "oldValue1",
 				"annotation3": "value3",
 			}
@@ -124,7 +124,7 @@ var _ = Describe("PipelineRun builder", func() {
 		})
 
 		It("should append a new finalizer to the existing finalizers", func() {
-			builder.pipelineRun.ObjectMeta.Finalizers = []string{"existingFinalizer"}
+			builder.pipelineRun.Finalizers = []string{"existingFinalizer"}
 			builder.WithFinalizer("finalizer2")
 			Expect(builder.pipelineRun.ObjectMeta.Finalizers).To(ContainElements("existingFinalizer", "finalizer2"))
 		})
@@ -149,7 +149,7 @@ var _ = Describe("PipelineRun builder", func() {
 		})
 
 		It("should update existing labels and add new ones", func() {
-			builder.pipelineRun.ObjectMeta.Labels = map[string]string{
+			builder.pipelineRun.Labels = map[string]string{
 				"label1": "oldValue1",
 				"label3": "value3",
 			}
@@ -307,11 +307,11 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithConfigMap("my-config", "/etc/config", nil, nil)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(1))
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-config"))
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Name).To(Equal("my-config"))
+			Expect(task.TaskSpec.Volumes).To(HaveLen(1))
+			Expect(task.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-config"))
+			Expect(task.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Name).To(Equal("my-config"))
 
-			for _, step := range task.TaskSpec.TaskSpec.Steps {
+			for _, step := range task.TaskSpec.Steps {
 				Expect(step.VolumeMounts).To(ContainElement(
 					HaveField("MountPath", "/etc/config"),
 				))
@@ -323,7 +323,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithConfigMap("my-config", "/etc/config", nil, opts)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			for _, step := range task.TaskSpec.TaskSpec.Steps {
+			for _, step := range task.TaskSpec.Steps {
 				if step.Name == "renovate" {
 					Expect(step.VolumeMounts).To(ContainElement(
 						HaveField("MountPath", "/etc/config"),
@@ -347,7 +347,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithConfigMap("my-config", "/etc/config", items, nil)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Items).To(Equal(items))
+			Expect(task.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Items).To(Equal(items))
 		})
 
 		It("should set optional and default mode from MountOptions", func() {
@@ -361,15 +361,15 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithConfigMap("my-config", "/etc/config", nil, opts)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(*task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Optional).To(BeTrue())
-			Expect(*task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode).To(Equal(mode))
+			Expect(*task.TaskSpec.Volumes[0].VolumeSource.ConfigMap.Optional).To(BeTrue())
+			Expect(*task.TaskSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode).To(Equal(mode))
 		})
 
 		It("should handle dots in configmap name", func() {
 			builder.WithConfigMap("my.dotted.config", "/etc/config", nil, nil)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-dotted-config"))
+			Expect(task.TaskSpec.Volumes[0].Name).To(Equal("configmap-my-dotted-config"))
 		})
 	})
 
@@ -384,10 +384,10 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithSecret("my-secret", "/etc/secret", nil, nil)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(1))
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].VolumeSource.Secret.SecretName).To(Equal("my-secret"))
+			Expect(task.TaskSpec.Volumes).To(HaveLen(1))
+			Expect(task.TaskSpec.Volumes[0].VolumeSource.Secret.SecretName).To(Equal("my-secret"))
 
-			for _, step := range task.TaskSpec.TaskSpec.Steps {
+			for _, step := range task.TaskSpec.Steps {
 				Expect(step.VolumeMounts).To(ContainElement(
 					HaveField("MountPath", "/etc/secret"),
 				))
@@ -399,7 +399,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithSecret("my-secret", "/etc/secret", nil, opts)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			for _, step := range task.TaskSpec.TaskSpec.Steps {
+			for _, step := range task.TaskSpec.Steps {
 				if step.Name == "renovate" {
 					Expect(step.VolumeMounts).To(ContainElement(
 						HaveField("MountPath", "/etc/secret"),
@@ -421,8 +421,8 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithSecret("my-secret", "/etc/secret2", nil, nil)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			Expect(task.TaskSpec.TaskSpec.Volumes).To(HaveLen(2))
-			Expect(task.TaskSpec.TaskSpec.Volumes[0].Name).ToNot(Equal(task.TaskSpec.TaskSpec.Volumes[1].Name))
+			Expect(task.TaskSpec.Volumes).To(HaveLen(2))
+			Expect(task.TaskSpec.Volumes[0].Name).ToNot(Equal(task.TaskSpec.Volumes[1].Name))
 		})
 
 		It("should set read-only to false when specified", func() {
@@ -430,7 +430,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithSecret("my-secret", "/etc/secret", nil, opts)
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			for _, step := range task.TaskSpec.TaskSpec.Steps {
+			for _, step := range task.TaskSpec.Steps {
 				for _, vm := range step.VolumeMounts {
 					if vm.MountPath == "/etc/secret" {
 						Expect(vm.ReadOnly).To(BeFalse())
@@ -446,7 +446,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithKiteIntegration("https://kite.example.com")
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			steps := task.TaskSpec.TaskSpec.Steps
+			steps := task.TaskSpec.Steps
 			lastStep := steps[len(steps)-1]
 
 			Expect(lastStep.Name).To(Equal("log-analyzer"))
