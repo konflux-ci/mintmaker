@@ -9,7 +9,7 @@ on:
       - reopened
 jobs:
   go-lint:
-    name: Lint Go
+    name: Lint Go and PLR shell scripts
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -34,7 +34,7 @@ jobs:
       - name: Check go mod status
         run: |
           go mod tidy
-          if [[ ! -z $(git status -s) ]]
+          if [[ -n $(git status -s) ]]
           then
             echo "Go mod state is not clean:"
             git --no-pager diff
@@ -43,7 +43,7 @@ jobs:
       - name: Check format
         run: |
           make fmt
-          if [[ ! -z $(git status -s) ]]
+          if [[ -n $(git status -s) ]]
           then
             echo "Some files are not properly formatted."
             echo "Please run 'make fmt' and amend your commit."
@@ -53,7 +53,7 @@ jobs:
       - name: Check manifests
         run: |
           make generate manifests
-          if [[ ! -z $(git status -s) ]]
+          if [[ -n $(git status -s) ]]
           then
             echo "Generated sources are not up to date:"
             git --no-pager diff
@@ -61,12 +61,19 @@ jobs:
           fi
       - name: Check RBAC wildcards
         run: |
-          if grep -n "*" config/rbac/*.yaml ; then
+          if grep -Fn '*' config/rbac/*.yaml ; then
             echo "RBAC files contain wildcards (*)"
             exit 1
           fi
       - name: Run golangci-lint
         run: make lint
+      - name: Install shellcheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      - name: Shellcheck embedded Tekton scripts
+        run: make shellcheck
 
   markdown-lint:
     name: Lint Markdown
@@ -91,6 +98,33 @@ jobs:
           version: v0.7.6
           directory: config
           config: .kube-linter.yaml
+
+  workflow-lint:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install shellcheck and actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.7
+          # SHA256 from actionlint_1.7.7_checksums.txt (linux_amd64 release asset).
+          ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar xzf "${archive}"
+          sudo install -m 755 actionlint /usr/local/bin/actionlint
+
+      - name: Run actionlint
+        run: make actionlint
 
   agent:
     name: Agent
