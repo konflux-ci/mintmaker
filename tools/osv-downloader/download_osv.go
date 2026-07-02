@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/go-github/v82/github"
+	"github.com/google/go-github/v88/github"
 )
 
 // Download and extract the upstream OSV database
