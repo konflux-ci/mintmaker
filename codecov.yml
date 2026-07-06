@@ -18,6 +18,12 @@ ignore:
   - "api/v1alpha1/dependencyupdatecheck_types.go"
   - "**/mock_*.go"
   - "cmd/"
+  - ".github/**"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.toml"
+  - "**/*.sh"
+  - "**/*.md"
 
 flags:
   unit-tests:
