@@ -531,6 +531,12 @@
           "quay.io/redhat-appstudio-tekton-catalog/task-verify-signed-rpms"
         ],
         "replacementName": "quay.io/konflux-ci/tekton-catalog/task-verify-signed-rpms"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/konflux-ci/buildah-task"
+        ],
+        "replacementName": "quay.io/konflux-ci/task-runner"
       }
     ],
     "schedule": [
