@@ -107,6 +107,7 @@
           "/^quay.io/konflux-ci/tekton-catalog//"
         ],
         "enabled": true,
+        "versioning": "semver-coerced",
         "groupName": "Konflux references",
         "branchPrefix": "konflux/references/",
         "additionalBranchPrefix": "",
