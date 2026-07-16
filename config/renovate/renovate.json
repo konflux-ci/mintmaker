@@ -136,6 +136,21 @@
       },
       {
         "matchPackageNames": [
+          "/^quay.io/konflux-ci/konflux-vanguard//"
+        ],
+        "matchUpdateTypes": [
+          "replacement"
+        ],
+        "branchPrefix": "konflux/references-replacement/",
+        "groupName": "Konflux references replacement",
+        "group": {
+          "commitMessageTopic": "{{depName}} references",
+          "commitMessageExtra": "",
+          "commitBody": "konflux-vanguard is no longer updated for Tekton tasks that moved to\ntekton-catalog; replace the references with equivalent\nkonflux-ci/tekton-catalog references"
+        }
+      },
+      {
+        "matchPackageNames": [
           "quay.io/redhat-appstudio-tekton-catalog/task-acs-deploy-check"
         ],
         "replacementName": "quay.io/konflux-ci/tekton-catalog/task-acs-deploy-check"
@@ -407,6 +422,12 @@
       {
         "matchPackageNames": [
           "quay.io/redhat-appstudio-tekton-catalog/task-rpms-signature-scan"
+        ],
+        "replacementName": "quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan"
+      },
+      {
+        "matchPackageNames": [
+          "quay.io/konflux-ci/konflux-vanguard/task-rpms-signature-scan"
         ],
         "replacementName": "quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan"
       },
