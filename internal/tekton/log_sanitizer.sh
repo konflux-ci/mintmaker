@@ -41,6 +41,7 @@ fi
 REDACT_FAILED=0
 while IFS= read -r secret; do
   if [ -n "$secret" ]; then
+    # Prepend '\' to BRE metacharacters and the sed delimiter (|) so sed treats them as literal characters
     ESCAPED=$(printf '%s\n' "$secret" | sed 's/[[\.*^$|\\]/\\&/g')
     if ! sed -i "s|${ESCAPED}|**REDACTED**|g" "${LOG_FILE}.tmp"; then
       REDACT_FAILED=1
