@@ -16,7 +16,6 @@ package tekton
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -447,7 +446,7 @@ var _ = Describe("PipelineRun builder", func() {
 		It("should include a log-sanitizer step after the renovate step", func() {
 			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			steps := task.TaskSpec.TaskSpec.Steps
+			steps := task.TaskSpec.Steps
 
 			Expect(steps).To(HaveLen(4))
 			Expect(steps[2].Name).To(Equal("renovate"))
@@ -457,18 +456,17 @@ var _ = Describe("PipelineRun builder", func() {
 		It("should use the default leaktk image", func() {
 			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			logSanitizerStep := task.TaskSpec.TaskSpec.Steps[3]
+			logSanitizerStep := task.TaskSpec.Steps[3]
 
 			Expect(logSanitizerStep.Image).To(Equal(DefaultLeakTKImageURL))
 		})
 
 		It("should use LEAKTK_IMAGE env var when set", func() {
-			os.Setenv("LEAKTK_IMAGE", "custom-registry.io/leaktk:v1.0")
-			defer os.Unsetenv("LEAKTK_IMAGE")
+			GinkgoT().Setenv("LEAKTK_IMAGE", "custom-registry.io/leaktk:v1.0")
 
 			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			logSanitizerStep := task.TaskSpec.TaskSpec.Steps[3]
+			logSanitizerStep := task.TaskSpec.Steps[3]
 
 			Expect(logSanitizerStep.Image).To(Equal("custom-registry.io/leaktk:v1.0"))
 		})
@@ -476,7 +474,7 @@ var _ = Describe("PipelineRun builder", func() {
 		It("should set proper security context", func() {
 			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			logSanitizerStep := task.TaskSpec.TaskSpec.Steps[3]
+			logSanitizerStep := task.TaskSpec.Steps[3]
 
 			Expect(logSanitizerStep.SecurityContext).ToNot(BeNil())
 			Expect(logSanitizerStep.SecurityContext.RunAsNonRoot).To(Equal(ptr.To(true)))
@@ -489,7 +487,7 @@ var _ = Describe("PipelineRun builder", func() {
 			builder.WithKiteIntegration("https://kite.example.com")
 
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
-			steps := task.TaskSpec.TaskSpec.Steps
+			steps := task.TaskSpec.Steps
 
 			Expect(steps).To(HaveLen(5))
 			Expect(steps[3].Name).To(Equal("log-sanitizer"))

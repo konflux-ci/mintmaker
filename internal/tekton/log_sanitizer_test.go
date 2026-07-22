@@ -26,12 +26,12 @@ import (
 
 func writeStub(dir, name, script string) {
 	path := filepath.Join(dir, name)
-	err := os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0755)
+	err := os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0755) //nolint:gosec // test stub needs to be executable
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func runSanitizer(scriptPath, logFile, mockDir string) (string, int) {
-	cmd := exec.Command("sh", scriptPath)
+	cmd := exec.Command("sh", scriptPath) //nolint:gosec // test helper runs the script under test
 	cmd.Env = []string{
 		"LOG_FILE=" + logFile,
 		"PATH=" + mockDir + ":/usr/bin:/bin",
@@ -61,10 +61,10 @@ var _ = Describe("log_sanitizer.sh", func() {
 	BeforeEach(func() {
 		tmpDir = GinkgoT().TempDir()
 		mockDir = filepath.Join(tmpDir, "mocks")
-		Expect(os.Mkdir(mockDir, 0755)).To(Succeed())
+		Expect(os.Mkdir(mockDir, 0750)).To(Succeed())
 		logFile = filepath.Join(tmpDir, "renovate-logs.json")
 		scriptFile = filepath.Join(tmpDir, "log_sanitizer.sh")
-		Expect(os.WriteFile(scriptFile, []byte(logSanitizerScript), 0755)).To(Succeed())
+		Expect(os.WriteFile(scriptFile, []byte(logSanitizerScript), 0600)).To(Succeed())
 	})
 
 	When("log file does not exist", func() {
@@ -78,7 +78,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("leaktk scan fails", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo "scan error" >&2; exit 1`)
 		})
 
@@ -87,7 +87,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("leaktk scan failed"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
 		})
@@ -95,7 +95,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("leaktk returns empty stdout", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `exit 0`)
 		})
 
@@ -104,7 +104,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("No secrets detected or scanner produced no output"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"some": "log"}`))
 		})
@@ -112,7 +112,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("python3 parsing fails", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "abc"}]}'`)
 			writeStub(mockDir, "python3", `exit 1`)
 		})
@@ -122,7 +122,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Failed to parse leaktk output"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
 		})
@@ -130,7 +130,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("leaktk returns results JSON but no secrets in it", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": []}'`)
 			writeStub(mockDir, "python3", `echo ""`)
 		})
@@ -140,7 +140,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("No secrets found in log file"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"some": "log"}`))
 		})
@@ -148,7 +148,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("secrets are found", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
 			writeStub(mockDir, "python3", `echo "my-secret-value"`)
 		})
@@ -158,7 +158,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Log sanitization complete"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"msg": "token **REDACTED** here"}`))
 			Expect(string(logContent)).NotTo(ContainSubstring("my-secret-value"))
@@ -167,7 +167,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("cp fails to create the temporary file", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
 			writeStub(mockDir, "python3", `echo "my-secret-value"`)
 			writeStub(mockDir, "cp", `exit 1`)
@@ -178,7 +178,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Failed to create temporary log file"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
 		})
@@ -186,7 +186,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("mv fails to replace the log file", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
 			writeStub(mockDir, "python3", `echo "my-secret-value"`)
 			writeStub(mockDir, "mv", `exit 1`)
@@ -197,7 +197,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Failed to replace log file with redacted version"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
 		})
@@ -205,7 +205,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 	When("secrets contain sed-special characters", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my.secret*value[0]|$x\y^(a+b?c{1}) here"}`), 0644)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my.secret*value[0]|$x\y^(a+b?c{1}) here"}`), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my.secret*value[0]|$x\\y^(a+b?c{1})"}]}'`)
 			writeStub(mockDir, "python3", `printf 'my.secret*value[0]|$x\\y^(a+b?c{1})\n'`)
 		})
@@ -215,7 +215,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Log sanitization complete"))
-			logContent, err := os.ReadFile(logFile)
+			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"msg": "token **REDACTED** here"}`))
 			Expect(string(logContent)).NotTo(ContainSubstring("my.secret*value[0]|$x\\y^(a+b?c{1})"))
