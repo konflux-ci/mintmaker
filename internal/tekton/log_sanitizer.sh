@@ -34,16 +34,28 @@ if [ -z "$SECRETS" ]; then
   echo 'No secrets found in log file'
   exit 0
 fi
-cp "$LOG_FILE" "${LOG_FILE}.tmp"
-echo "$SECRETS" | while IFS= read -r secret; do
+if ! cp "$LOG_FILE" "${LOG_FILE}.tmp"; then
+  echo 'Failed to create temporary log file'
+  fail_safe
+fi
+REDACT_FAILED=0
+while IFS= read -r secret; do
   if [ -n "$secret" ]; then
-    ESCAPED=$(printf '%s\n' "$secret" | sed 's/[[\.*^$()+?{|\\]/\\&/g')
-    sed -i "s|${ESCAPED}|**REDACTED**|g" "${LOG_FILE}.tmp"
+    ESCAPED=$(printf '%s\n' "$secret" | sed 's/[[\.*^$|\\]/\\&/g')
+    if ! sed -i "s|${ESCAPED}|**REDACTED**|g" "${LOG_FILE}.tmp"; then
+      REDACT_FAILED=1
+      break
+    fi
   fi
-done
-if [ $? -ne 0 ]; then
+done <<EOF
+$SECRETS
+EOF
+if [ "$REDACT_FAILED" -eq 1 ]; then
   echo 'Failed to redact secrets from log file'
   fail_safe
 fi
-mv "${LOG_FILE}.tmp" "$LOG_FILE"
+if ! mv "${LOG_FILE}.tmp" "$LOG_FILE"; then
+  echo 'Failed to replace log file with redacted version'
+  fail_safe
+fi
 echo 'Log sanitization complete'

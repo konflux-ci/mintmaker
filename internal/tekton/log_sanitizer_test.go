@@ -165,11 +165,49 @@ var _ = Describe("log_sanitizer.sh", func() {
 		})
 	})
 
+	When("cp fails to create the temporary file", func() {
+		BeforeEach(func() {
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0644)).To(Succeed())
+			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
+			writeStub(mockDir, "python3", `echo "my-secret-value"`)
+			writeStub(mockDir, "cp", `exit 1`)
+		})
+
+		It("should call fail_safe and overwrite the log file", func() {
+			output, exitCode := runSanitizer(scriptFile, logFile, mockDir)
+
+			Expect(exitCode).To(Equal(0))
+			Expect(output).To(ContainSubstring("Failed to create temporary log file"))
+			logContent, err := os.ReadFile(logFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
+		})
+	})
+
+	When("mv fails to replace the log file", func() {
+		BeforeEach(func() {
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0644)).To(Succeed())
+			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
+			writeStub(mockDir, "python3", `echo "my-secret-value"`)
+			writeStub(mockDir, "mv", `exit 1`)
+		})
+
+		It("should call fail_safe and overwrite the log file", func() {
+			output, exitCode := runSanitizer(scriptFile, logFile, mockDir)
+
+			Expect(exitCode).To(Equal(0))
+			Expect(output).To(ContainSubstring("Failed to replace log file with redacted version"))
+			logContent, err := os.ReadFile(logFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
+		})
+	})
+
 	When("secrets contain sed-special characters", func() {
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my.secret*value[0] here"}`), 0644)).To(Succeed())
-			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my.secret*value[0]"}]}'`)
-			writeStub(mockDir, "python3", `echo "my.secret*value[0]"`)
+			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my.secret*value[0]|$x\y^(a+b?c{1}) here"}`), 0644)).To(Succeed())
+			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my.secret*value[0]|$x\\y^(a+b?c{1})"}]}'`)
+			writeStub(mockDir, "python3", `printf 'my.secret*value[0]|$x\\y^(a+b?c{1})\n'`)
 		})
 
 		It("should correctly redact secrets with regex metacharacters", func() {
@@ -180,7 +218,7 @@ var _ = Describe("log_sanitizer.sh", func() {
 			logContent, err := os.ReadFile(logFile)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"msg": "token **REDACTED** here"}`))
-			Expect(string(logContent)).NotTo(ContainSubstring("my.secret*value[0]"))
+			Expect(string(logContent)).NotTo(ContainSubstring("my.secret*value[0]|$x\\y^(a+b?c{1})"))
 		})
 	})
 })
