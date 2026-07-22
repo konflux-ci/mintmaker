@@ -127,6 +127,16 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+ACTIONLINT ?= actionlint
+
+.PHONY: actionlint
+actionlint: ## Lint GitHub Actions workflows (including inline run: shell)
+	@set -e; \
+	for f in .github/workflows/*; do \
+		$(ACTIONLINT) "$$f"; \
+		echo "$$f - ok"; \
+	done
+
 ##@ Build
 
 .PHONY: build

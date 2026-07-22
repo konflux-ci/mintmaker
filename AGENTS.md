@@ -19,6 +19,7 @@ Run from the repository root. See `make help` for every target.
 | `make fmt` | Runs `go fmt ./...` on all packages. CI fails if code is not formatted. |
 | `make vet` | Runs `go vet ./...` for static analysis. |
 | `make lint` | Runs `golangci-lint` using the `.golangci.yaml` config file on the repository. |
+| `make actionlint` | Lints `.github/workflows/` (including inline `run:` shell when `shellcheck` is installed). |
 | `make generate` | Regenerates DeepCopy methods (`controller-gen object`); needed after API type changes. Output includes `zz_generated.deepcopy.go` files — do not edit. |
 | `make manifests` | Regenerates CRD YAML under `config/crd/bases/` and RBAC under `config/rbac/` from kubebuilder markers and API types — do not edit generated YAML files. |
 | `make test` | Runs `manifests`, `generate`, `fmt`, `vet`, then unit and integration tests with **envtest** (downloads kubebuilder assets for `ENVTEST_K8S_VERSION` in the Makefile). Produces `cover.out`. |
