@@ -13,7 +13,7 @@ fi
 echo 'Scanning log file for leaked secrets...'
 SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>&1)
 if [ $? -ne 0 ]; then
-  echo "leaktk scan failed: $SCAN_OUTPUT"
+  echo 'leaktk scan failed'
   fail_safe
 fi
 if [ -z "$SCAN_OUTPUT" ]; then
