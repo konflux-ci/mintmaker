@@ -11,7 +11,7 @@ if [ ! -f "$LOG_FILE" ]; then
   exit 0
 fi
 echo 'Scanning log file for leaked secrets...'
-SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>&1)
+SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>/dev/null)
 if [ $? -ne 0 ]; then
   echo 'leaktk scan failed'
   fail_safe
