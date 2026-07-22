@@ -107,9 +107,9 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 	if renovateImageURL == "" {
 		renovateImageURL = mmconst.DefaultRenovateImageURL
 	}
-	leaktkImageURL := os.Getenv(LeakTKImageEnvName)
+	leaktkImageURL := os.Getenv(mmconst.LeakTKImageEnvName)
 	if leaktkImageURL == "" {
-		leaktkImageURL = DefaultLeakTKImageURL
+		leaktkImageURL = mmconst.DefaultLeakTKImageURL
 	}
 	return &PipelineRunBuilder{
 		pipelineRun: &tektonv1.PipelineRun{
