@@ -19,11 +19,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	. "github.com/konflux-ci/mintmaker/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("PipelineRun builder", func() {
@@ -437,6 +439,59 @@ var _ = Describe("PipelineRun builder", func() {
 					}
 				}
 			}
+		})
+	})
+
+	When("log-sanitizer step is created", func() {
+		It("should include a log-sanitizer step after the renovate step", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			steps := task.TaskSpec.Steps
+
+			Expect(steps).To(HaveLen(4))
+			Expect(steps[2].Name).To(Equal("renovate"))
+			Expect(steps[3].Name).To(Equal("log-sanitizer"))
+		})
+
+		It("should use the default leaktk image", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			logSanitizerStep := task.TaskSpec.Steps[3]
+
+			Expect(logSanitizerStep.Image).To(Equal(DefaultLeakTKImageURL))
+		})
+
+		It("should use LEAKTK_IMAGE env var when set", func() {
+			GinkgoT().Setenv("LEAKTK_IMAGE", "custom-registry.io/leaktk:v1.0")
+
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			logSanitizerStep := task.TaskSpec.Steps[3]
+
+			Expect(logSanitizerStep.Image).To(Equal("custom-registry.io/leaktk:v1.0"))
+		})
+
+		It("should set proper security context", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			logSanitizerStep := task.TaskSpec.Steps[3]
+
+			Expect(logSanitizerStep.SecurityContext).ToNot(BeNil())
+			Expect(logSanitizerStep.SecurityContext.RunAsNonRoot).To(Equal(ptr.To(true)))
+			Expect(logSanitizerStep.SecurityContext.AllowPrivilegeEscalation).To(Equal(ptr.To(false)))
+			Expect(logSanitizerStep.SecurityContext.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+		})
+
+		It("should place log-sanitizer before log-analyzer when WithKiteIntegration is used", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			builder.WithKiteIntegration("https://kite.example.com")
+
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			steps := task.TaskSpec.Steps
+
+			Expect(steps).To(HaveLen(5))
+			Expect(steps[3].Name).To(Equal("log-sanitizer"))
+			Expect(steps[4].Name).To(Equal("log-analyzer"))
 		})
 	})
 
