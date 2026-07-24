@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: konflux-ci/renovate-config-validator-action@715fae6ea7b656ccefead2dec09ee41d395bee6d # main
+      - uses: konflux-ci/renovate-config-validator-action@1891cfbf5e12443366e799383d6b8141310883b8 # main
         with:
           config_file: .github/renovate.json
 
@@ -21,6 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: konflux-ci/renovate-config-validator-action@715fae6ea7b656ccefead2dec09ee41d395bee6d # main
+      - uses: konflux-ci/renovate-config-validator-action@1891cfbf5e12443366e799383d6b8141310883b8 # main
         with:
           config_file: config/renovate/renovate.json
