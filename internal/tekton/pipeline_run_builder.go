@@ -15,6 +15,7 @@
 package tekton
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -35,6 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+//go:embed log_sanitizer.sh
+var logSanitizerScript string
 
 type PipelineRunBuilder struct {
 	err         *multierror.Error
@@ -102,6 +106,10 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 	renovateImageURL := os.Getenv(mmconst.RenovateImageEnvName)
 	if renovateImageURL == "" {
 		renovateImageURL = mmconst.DefaultRenovateImageURL
+	}
+	leaktkImageURL := os.Getenv(mmconst.LeakTKImageEnvName)
+	if leaktkImageURL == "" {
+		leaktkImageURL = mmconst.DefaultLeakTKImageURL
 	}
 	return &PipelineRunBuilder{
 		pipelineRun: &tektonv1.PipelineRun{
@@ -236,6 +244,33 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 												{
 													Name:  "RENOVATE_X_GITLAB_AUTO_MERGEABLE_CHECK_ATTEMPS",
 													Value: "7",
+												},
+											},
+										},
+										{
+											Name:  "log-sanitizer",
+											Image: leaktkImageURL,
+											Env: []corev1.EnvVar{
+												{
+													Name:  "HOME",
+													Value: "/tmp",
+												},
+											},
+											Script: logSanitizerScript,
+											SecurityContext: &corev1.SecurityContext{
+												Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+												RunAsNonRoot:             ptr.To(true),
+												RunAsUser:                &normalUser,
+												AllowPrivilegeEscalation: ptr.To(false),
+											},
+											ComputeResources: corev1.ResourceRequirements{
+												Requests: corev1.ResourceList{
+													"cpu":    resource.MustParse("100m"),
+													"memory": resource.MustParse("256Mi"),
+												},
+												Limits: corev1.ResourceList{
+													"cpu":    resource.MustParse("100m"),
+													"memory": resource.MustParse("256Mi"),
 												},
 											},
 										},
