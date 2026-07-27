@@ -49,5 +49,13 @@
         }
       }
     ]
-  }
+  },
+  "packageRules": [
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    }
+  ]
 }
