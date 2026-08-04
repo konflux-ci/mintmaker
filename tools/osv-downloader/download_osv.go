@@ -10,13 +10,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/go-github/v82/github"
+	"github.com/google/go-github/v89/github"
 )
 
 // Download and extract the upstream OSV database
 func DownloadOsvDb(path string) error {
 	fmt.Println("getting osv-offline.zip URL from Github")
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		return fmt.Errorf("error creating GitHub client: %w", err)
+	}
 	release, _, err := client.Repositories.GetLatestRelease(context.Background(), "renovatebot", "osv-offline")
 	if err != nil {
 		return fmt.Errorf("error when accessing latest osv-offline release: %s", err)
