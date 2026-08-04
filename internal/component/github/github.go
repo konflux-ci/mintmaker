@@ -250,7 +250,10 @@ func (c *Component) fetchAppInstallations() ([]AppInstallation, error) {
 		return nil, err
 	}
 
-	client := github.NewClient(&http.Client{Transport: itr})
+	client, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: itr}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 	_, _, err = client.Apps.Get(context.Background(), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load GitHub app metadata, %w", err)
@@ -282,7 +285,10 @@ func (c *Component) fetchAppInstallations() ([]AppInstallation, error) {
 				return nil, fmt.Errorf("error creating installation transport: %w", err)
 			}
 
-			installationClient := github.NewClient(&http.Client{Transport: itr})
+			installationClient, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: itr}))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create GitHub installation client: %w", err)
+			}
 			repoOpt := &github.ListOptions{PerPage: 100}
 			for {
 				repos, repoResp, err := installationClient.Apps.ListRepos(context.Background(), repoOpt)
@@ -351,7 +357,10 @@ func (c *Component) getAppSlug() (string, error) {
 		return "", err
 	}
 
-	client := github.NewClient(&http.Client{Transport: itr})
+	client, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: itr}))
+	if err != nil {
+		return "", fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 	app, _, err := client.Apps.Get(context.Background(), "")
 	if err != nil {
 		return "", fmt.Errorf("failed to load GitHub app metadata, %w", err)
@@ -366,7 +375,10 @@ func (c *Component) getUserId(username string) (int64, error) {
 		return ghUserID, nil
 	}
 	// No need to add auth here as User API is public
-	client := github.NewClient(&http.Client{})
+	client, err := github.NewClient()
+	if err != nil {
+		return 0, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 
 	user, _, err := client.Users.Get(context.Background(), username)
 	if err != nil {
@@ -427,7 +439,10 @@ func (c *Component) getClient() (*github.Client, error) {
 		&oauth2.Token{AccessToken: token},
 	)
 	tc := oauth2.NewClient(context.Background(), ts)
-	client := github.NewClient(tc)
+	client, err := github.NewClient(github.WithHTTPClient(tc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 
 	return client, nil
 }
