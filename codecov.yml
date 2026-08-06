@@ -24,6 +24,11 @@ ignore:
   - "**/*.toml"
   - "**/*.sh"
   - "**/*.md"
+  - ".agents/**"
+  - ".claude/**"
+  - ".cursor/**"
+  - "skills/**"
+  - "docs/**"
 
 flags:
   unit-tests:
