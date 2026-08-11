@@ -20,7 +20,6 @@ name: fullsend
 permissions:
   actions: write
   id-token: write
-  checks: read
   contents: read
   pull-requests: read
 
@@ -35,37 +34,14 @@ on:
     types: [submitted]
 
 jobs:
-  wait-for-go-lint:
-    if: >-
-      github.event_name == 'pull_request_target'
-      && contains(fromJSON('["opened","synchronize","ready_for_review"]'), github.event.action)
-    runs-on: ubuntu-latest
-    permissions:
-      checks: read
-      pull-requests: read
-    steps:
-      - name: Wait for Lint Go
-        uses: lewagon/wait-on-check-action@2271c86c146b96545b4e871b855e10ffa6f50773 # v1.9.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          check-name: "Lint Go"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 15
-          checks-discovery-timeout: 600
-
   dispatch:
-    needs: wait-for-go-lint
     concurrency:
       group: fullsend-dispatch-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     if: >-
-      always()
-      && (needs.wait-for-go-lint.result == 'success' || needs.wait-for-go-lint.result == 'skipped')
-      && (
-        github.event_name != 'issue_comment'
-        || github.event.comment.user.type != 'Bot'
-      )
-    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@37b10e41bbe2845778e12570bcb0cf1a7b56d901 # main
+      github.event_name != 'issue_comment'
+      || github.event.comment.user.type != 'Bot'
+    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@main
     with:
       event_action: ${{ github.event.action }}
 
