@@ -79,14 +79,15 @@ var _ = Describe("log_sanitizer.sh", func() {
 	When("leaktk scan fails", func() {
 		BeforeEach(func() {
 			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
-			writeStub(mockDir, "leaktk", `echo "scan error" >&2; exit 1`)
+			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "leaked-password"}]}'; echo "scan error" >&2; exit 1`)
 		})
 
-		It("should call fail_safe and overwrite the log file", func() {
+		It("should log the error but not the scan results", func() {
 			output, exitCode := runSanitizer(scriptFile, logFile, mockDir)
 
 			Expect(exitCode).To(Equal(0))
-			Expect(output).To(ContainSubstring("leaktk scan failed"))
+			Expect(output).To(ContainSubstring("leaktk scan failed: scan error"))
+			Expect(output).NotTo(ContainSubstring("leaked-password"))
 			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(ContainSubstring("Sanitization step failed"))
@@ -153,11 +154,12 @@ var _ = Describe("log_sanitizer.sh", func() {
 			writeStub(mockDir, "python3", `echo "my-secret-value"`)
 		})
 
-		It("should redact the secret from the log file", func() {
+		It("should redact the secret from the log file and not leak it in step output", func() {
 			output, exitCode := runSanitizer(scriptFile, logFile, mockDir)
 
 			Expect(exitCode).To(Equal(0))
 			Expect(output).To(ContainSubstring("Log sanitization complete"))
+			Expect(output).NotTo(ContainSubstring("my-secret-value"))
 			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(logContent)).To(Equal(`{"msg": "token **REDACTED** here"}`))
