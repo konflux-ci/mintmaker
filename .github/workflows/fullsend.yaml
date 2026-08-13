@@ -45,7 +45,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Wait for Lint Go
-        uses: lewagon/wait-on-check-action@2271c86c146b96545b4e871b855e10ffa6f50773 # v1.9.0
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           check-name: "Lint Go"
@@ -65,7 +65,7 @@ jobs:
         github.event_name != 'issue_comment'
         || github.event.comment.user.type != 'Bot'
       )
-    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@37b10e41bbe2845778e12570bcb0cf1a7b56d901 # main
+    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@1e6444781893685ec21d3e0df40d37abc976b7bd # main
     with:
       event_action: ${{ github.event.action }}
 
