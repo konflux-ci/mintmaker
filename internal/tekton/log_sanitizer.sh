@@ -11,9 +11,11 @@ if [ ! -f "$LOG_FILE" ]; then
   exit 0
 fi
 echo 'Scanning log file for leaked secrets...'
-SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>/dev/null)
+SCAN_STDERR=$(mktemp)
+trap 'rm -f "$SCAN_STDERR"' EXIT
+SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>"$SCAN_STDERR")
 if [ $? -ne 0 ]; then
-  echo 'leaktk scan failed'
+  echo "leaktk scan failed: $(cat "$SCAN_STDERR")"
   fail_safe
 fi
 if [ -z "$SCAN_OUTPUT" ]; then
