@@ -13,7 +13,7 @@ fi
 echo 'Scanning log file for leaked secrets...'
 SCAN_STDERR=$(mktemp)
 trap 'rm -f "$SCAN_STDERR"' EXIT
-SCAN_OUTPUT=$(leaktk scan --kind JSONData "@${LOG_FILE}" 2>"$SCAN_STDERR")
+SCAN_OUTPUT=$(leaktk scan --kind Text "@${LOG_FILE}" 2>"$SCAN_STDERR")
 if [ $? -ne 0 ]; then
   echo "leaktk scan failed: $(cat "$SCAN_STDERR")"
   fail_safe
