@@ -28,6 +28,8 @@
   "additionalBranchPrefix": "{{baseBranch}}/",
   "branchPrefix": "konflux/mintmaker/",
   "enabledManagers": [
+    "ansible",
+    "ansible-galaxy",
     "github-actions",
     "tekton",
     "dockerfile",
