@@ -76,6 +76,26 @@ var _ = Describe("log_sanitizer.sh", func() {
 		})
 	})
 
+	When("leaktk scan succeeds", func() {
+		BeforeEach(func() {
+			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
+			// Record the arguments leaktk was invoked with so we can assert the
+			// script scans the NDJSON log as plain text (--kind Text), not as a
+			// single JSON document (--kind JSONData), which fails on Renovate's
+			// newline-delimited JSON output.
+			writeStub(mockDir, "leaktk", `echo "$@" > "`+filepath.Join(tmpDir, "leaktk-args")+`"`)
+		})
+
+		It("should invoke leaktk with --kind Text", func() {
+			_, exitCode := runSanitizer(scriptFile, logFile, mockDir)
+
+			Expect(exitCode).To(Equal(0))
+			args, err := os.ReadFile(filepath.Join(tmpDir, "leaktk-args")) //nolint:gosec // test assertion
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(args)).To(ContainSubstring("scan --kind Text"))
+		})
+	})
+
 	When("leaktk scan fails", func() {
 		BeforeEach(func() {
 			Expect(os.WriteFile(logFile, []byte(`{"some": "log"}`), 0600)).To(Succeed())
@@ -148,8 +168,14 @@ var _ = Describe("log_sanitizer.sh", func() {
 	})
 
 	When("secrets are found", func() {
+		// Renovate emits newline-delimited JSON (NDJSON), not a single JSON
+		// document. The secret sits on one line among several.
+		ndjson := `{"level":30,"msg":"starting"}
+{"level":30,"msg":"token my-secret-value here"}
+{"level":30,"msg":"done"}`
+
 		BeforeEach(func() {
-			Expect(os.WriteFile(logFile, []byte(`{"msg": "token my-secret-value here"}`), 0600)).To(Succeed())
+			Expect(os.WriteFile(logFile, []byte(ndjson), 0600)).To(Succeed())
 			writeStub(mockDir, "leaktk", `echo '{"results": [{"secret": "my-secret-value"}]}'`)
 			writeStub(mockDir, "python3", `echo "my-secret-value"`)
 		})
@@ -162,7 +188,9 @@ var _ = Describe("log_sanitizer.sh", func() {
 			Expect(output).NotTo(ContainSubstring("my-secret-value"))
 			logContent, err := os.ReadFile(logFile) //nolint:gosec // test assertion
 			Expect(err).NotTo(HaveOccurred())
-			Expect(string(logContent)).To(Equal(`{"msg": "token **REDACTED** here"}`))
+			Expect(string(logContent)).To(Equal(`{"level":30,"msg":"starting"}
+{"level":30,"msg":"token **REDACTED** here"}
+{"level":30,"msg":"done"}`))
 			Expect(string(logContent)).NotTo(ContainSubstring("my-secret-value"))
 		})
 	})
