@@ -3,6 +3,7 @@
   "redisPrefix": "renovate-global-cache",
   "redisUrl": "redis://redis:6379",
   "allowShellExecutorForPostUpgradeCommands": true,
+  "executionTimeout": 25,
   "customEnvVariables": {
     "GOCACHE": "/tmp/go-build-cache",
     "GOTOOLCHAIN": "auto",
