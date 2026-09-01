@@ -236,6 +236,7 @@
   },
   "forkProcessing": "enabled",
   "allowedCommands": [
+    "^git submodule update --init(?: --recursive)?$",
     "^rpm-lockfile-prototype rpms.in.yaml$",
     "^pipeline-migration-tool migrate -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$",
     "^refresh-rpm-lockfiles -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$"
