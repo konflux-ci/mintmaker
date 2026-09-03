@@ -238,7 +238,8 @@
   "allowedCommands": [
     "^rpm-lockfile-prototype rpms.in.yaml$",
     "^pipeline-migration-tool migrate -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$",
-    "^refresh-rpm-lockfiles -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$"
+    "^refresh-rpm-lockfiles -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$",
+    "^update_artifacts_lockfile .+$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false,
