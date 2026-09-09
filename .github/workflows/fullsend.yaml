@@ -20,7 +20,6 @@ name: fullsend
 permissions:
   actions: write
   id-token: write
-  checks: read
   contents: read
   pull-requests: read
 
@@ -30,44 +29,57 @@ on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened, synchronize, ready_for_review, closed]
+    types: [closed]
   pull_request_review:
     types: [submitted]
 
 jobs:
-  wait-for-go-lint:
-    if: >-
-      github.event_name == 'pull_request_target'
-      && contains(fromJSON('["opened","synchronize","ready_for_review"]'), github.event.action)
-    runs-on: ubuntu-latest
-    permissions:
-      checks: read
-      pull-requests: read
-    steps:
-      - name: Wait for Lint Go
-        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          check-name: "Lint Go"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 15
-          checks-discovery-timeout: 600
-
   dispatch:
-    needs: wait-for-go-lint
     concurrency:
       group: fullsend-dispatch-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     if: >-
-      always()
-      && (needs.wait-for-go-lint.result == 'success' || needs.wait-for-go-lint.result == 'skipped')
-      && (
-        github.event_name != 'issue_comment'
-        || github.event.comment.user.type != 'Bot'
-      )
-    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@1e6444781893685ec21d3e0df40d37abc976b7bd # main
+      github.event_name != 'issue_comment'
+      || github.event.comment.user.type != 'Bot'
+    uses: konflux-ci/.fullsend/.github/workflows/dispatch.yml@main
     with:
       event_action: ${{ github.event.action }}
+
+  review-denied:
+    if: >-
+      github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && github.event.comment.user.type != 'Bot'
+        && (
+          contains(github.event.comment.body, '/fs-review')
+          || contains(github.event.comment.body, '/fullsend-review')
+        )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Notify unauthorized review request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR_ASSOC: ${{ github.event.comment.author_association }}
+        run: |
+          set -euo pipefail
+          # Keep command parsing in sync with dispatch.yml "Determine stage".
+          COMMAND="$(printf '%s\n' "${COMMENT_BODY}" | head -1 | awk '{print $1}')"
+          case "${COMMAND}" in
+            /fs-review|/fullsend-review) ;;
+            *) exit 0 ;;
+          esac
+          case "${COMMENT_AUTHOR_ASSOC}" in
+            OWNER|MEMBER|COLLABORATOR) exit 0 ;;
+          esac
+          gh pr comment "$PR_NUMBER" --repo "$REPO" \
+            --body "You do not have permission to run \`/fullsend-review\` or \`/fs-review\`. This command is restricted to authorized organization members."
 
   stop-fix:
     if: >-
