@@ -32,6 +32,7 @@ spec:
         # plugin. By storing the image reference here, we can dynamically update it with
         # Kustomize, and the container can access it using 'env[].valueFrom.fieldRef.fieldPath'.
         mintmaker.appstudio.redhat.com/renovate-image: quay.io/konflux-ci/mintmaker-renovate-image:latest
+        mintmaker.konflux-ci.dev/renovate-image: quay.io/konflux-ci/mintmaker-renovate-image:latest
       labels:
         control-plane: controller-manager
     spec:
