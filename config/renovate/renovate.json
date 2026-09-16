@@ -149,7 +149,7 @@
       }
     ],
     "schedule": [
-      "* 5-23 * * 6"
+      "* * * * 6"
     ],
     "postUpgradeTasks": {
       "commands": [
