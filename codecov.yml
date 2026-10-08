@@ -10,8 +10,8 @@ coverage:
         informational: true
     patch:
       default:
-        target: 80%
-        informational: true
+        target: 85%
+        informational: false
 
 ignore:
   - "api/v1alpha1/zz_generated.deepcopy.go"
