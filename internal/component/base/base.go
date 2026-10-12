@@ -29,7 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
 
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	bslices "github.com/konflux-ci/mintmaker/internal/slices"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 var (
@@ -188,23 +190,27 @@ func (c *BaseComponent) GetRPMActivationKey(ctx context.Context, k8sClient clien
 		defaultSecret = nil
 	}
 
-	secretList := &corev1.SecretList{}
-	opts := client.ListOption(&client.MatchingLabels{
-		"appstudio.redhat.com/credentials": "rpm",
-		"appstudio.redhat.com/scm.host":    c.Host,
-	})
-
-	// find secrets that have the following labels:
-	//	- "appstudio.redhat.com/credentials": "rpm"
-	//	- "appstudio.redhat.com/scm.host": <name of component host>
-	if err := k8sClient.List(ctx, secretList, client.InNamespace(c.Namespace), opts); err != nil {
-		return getActivationKeyFromSecret(defaultSecret)
+	labelSets := []map[string]string{
+		{mmconst.CredentialsLabel: "rpm", mmconst.SCMHostLabel: c.Host},
+		{mmconst.CredentialsLabelLegacy: "rpm", mmconst.SCMHostLabelLegacy: c.Host},
 	}
 
-	// filtering to get Opaque secrets and data is not empty
-	secrets := bslices.Filter(secretList.Items, func(secret corev1.Secret) bool {
-		return secret.Type == corev1.SecretTypeOpaque && len(secret.Data) > 0
-	})
+	// find secrets that have the following labels:
+	//	- "konflux-ci.dev/credentials": "rpm"
+	//	- "konflux-ci.dev/scm.host": <name of component host>
+	// Migration note: Temporarily fetch secrets for both new and legacy labels.
+	var secrets []corev1.Secret
+	for _, labels := range labelSets {
+		secretList := &corev1.SecretList{}
+		if err := k8sClient.List(ctx, secretList, client.InNamespace(c.Namespace), client.MatchingLabels(labels)); err != nil {
+			return getActivationKeyFromSecret(defaultSecret)
+		}
+		// filtering to get Opaque secrets and data is not empty
+		secrets = append(secrets, bslices.Filter(secretList.Items, func(secret corev1.Secret) bool {
+			return secret.Type == corev1.SecretTypeOpaque && len(secret.Data) > 0
+		})...)
+	}
+
 	if len(secrets) == 0 {
 		return getActivationKeyFromSecret(defaultSecret)
 	}
@@ -215,13 +221,13 @@ func (c *BaseComponent) GetRPMActivationKey(ctx context.Context, k8sClient clien
 	var potentialMatches = make(map[int]int, len(secrets))
 
 	for index, secret := range secrets {
-		repositoryLabel, exists := secret.Annotations["appstudio.redhat.com/scm.repository"]
-		if !exists || repositoryLabel == "" {
+		repositoryAnnotation := utils.GetAnnotation(&secret, mmconst.SCMRepositoryAnnotation, mmconst.SCMRepositoryAnnotationLegacy)
+		if repositoryAnnotation == "" {
 			hostOnlySecrets = append(hostOnlySecrets, secret)
 			continue
 		}
 
-		secretRepositories := strings.Split(repositoryLabel, ",")
+		secretRepositories := strings.Split(repositoryAnnotation, ",")
 		// trim possible prefix or suffix "/"
 		for i, repository := range secretRepositories {
 			secretRepositories[i] = strings.TrimPrefix(strings.TrimSuffix(repository, "/"), "/")

@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
+
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
@@ -67,16 +68,16 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				)
 
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, appComp *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, comp *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
-					branches := component.GetVersions(appComp)
+					branches := component.GetVersions(comp)
 					if len(branches) == 0 {
 						branches = []string{"main"}
 					}
 					mockComp.EXPECT().GetBranches().Return(branches, nil).Maybe()
-					mockComp.EXPECT().GetName().Return(appComp.Name).Maybe()
-					mockComp.EXPECT().GetNamespace().Return(appComp.Namespace).Maybe()
-					mockComp.EXPECT().GetApplication().Return(appComp.Spec.Application).Maybe()
+					mockComp.EXPECT().GetName().Return(comp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(comp.Namespace).Maybe()
+					mockComp.EXPECT().GetApplication().Return(comp.Annotations[MintMakerConvertedApplicationAnnotation]).Maybe()
 					mockComp.EXPECT().GetPlatform().Return("github").Maybe()
 					mockComp.EXPECT().GetHost().Return("github.com").Maybe()
 					mockComp.EXPECT().GetRepository().Return("testcomp").Maybe()
@@ -105,12 +106,12 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				}
 				// Override mock to return only 2 of 3 versions as branches
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, appComp *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, comp *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
 					mockComp.EXPECT().GetBranches().Return([]string{"gitrevision", "gitrevision-v1"}, nil).Maybe()
-					mockComp.EXPECT().GetName().Return(appComp.Name).Maybe()
-					mockComp.EXPECT().GetNamespace().Return(appComp.Namespace).Maybe()
-					mockComp.EXPECT().GetApplication().Return(appComp.Spec.Application).Maybe()
+					mockComp.EXPECT().GetName().Return(comp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(comp.Namespace).Maybe()
+					mockComp.EXPECT().GetApplication().Return(comp.Annotations[MintMakerConvertedApplicationAnnotation]).Maybe()
 					mockComp.EXPECT().GetPlatform().Return("github").Maybe()
 					mockComp.EXPECT().GetHost().Return("github.com").Maybe()
 					mockComp.EXPECT().GetRepository().Return("testcomp").Maybe()
@@ -147,7 +148,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				for i, branch := range branches {
 					hashValue := utils.RepoBranchHash("github.com", "testcomp", branch)
 					labels := map[string]string{
-						MintMakerRepoBranchHashLabel: hashValue,
+						MintMakerRepoBranchHashLabelLegacy: hashValue,
 					}
 					createMintmakerPipelineRun(fmt.Sprintf("existing-active-pr-%d", i), MintMakerNamespaceName, labels, "")
 				}
@@ -164,7 +165,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				// Pre-create a completed PipelineRun for the first branch
 				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
 				labels := map[string]string{
-					MintMakerRepoBranchHashLabel: hashValue,
+					MintMakerRepoBranchHashLabelLegacy: hashValue,
 				}
 				createMintmakerPipelineRun("completed-pr", MintMakerNamespaceName, labels, corev1.ConditionTrue)
 
@@ -180,7 +181,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				// Pre-create a failed PipelineRun for the first branch
 				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
 				labels := map[string]string{
-					MintMakerRepoBranchHashLabel: hashValue,
+					MintMakerRepoBranchHashLabelLegacy: hashValue,
 				}
 				createMintmakerPipelineRun("failed-pr", MintMakerNamespaceName, labels, corev1.ConditionFalse)
 
@@ -290,7 +291,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 
 					// Add the internal label to the registry secret
 					registrySecret := getSecret(registrySecretKey)
-					registrySecret.Labels = map[string]string{InternalSecretLabelName: "true"}
+					registrySecret.Labels = map[string]string{InternalSecretLabel: "true"}
 					Expect(k8sClient.Update(ctx, registrySecret)).Should(Succeed())
 
 					// Link the registry secret to the service account
