@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
+
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
@@ -57,7 +58,7 @@ var _ = Describe("Event Controller", func() {
 
 			BeforeEach(func() {
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, _ *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
 					mockComp.EXPECT().GetToken().Return("fake-token", nil).Maybe()
 					return mockComp, nil
@@ -258,7 +259,7 @@ var _ = Describe("Event Controller", func() {
 						Name:      "test-event-processed",
 						Namespace: MintMakerNamespaceName,
 						Annotations: map[string]string{
-							"mintmaker.appstudio.redhat.com/processed": "true",
+							MintMakerProcessedAnnotationName: "true",
 						},
 					},
 					InvolvedObject: corev1.ObjectReference{
@@ -298,7 +299,7 @@ var _ = Describe("Event Controller", func() {
 				Expect(k8sClient.Update(ctx, pod)).Should(Succeed())
 
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, _ *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
 					mockComp.EXPECT().GetToken().Return("", errors.New("token error")).Maybe()
 					return mockComp, nil

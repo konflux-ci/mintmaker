@@ -26,9 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 
 	"github.com/konflux-ci/mintmaker/internal/component/base"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	bslices "github.com/konflux-ci/mintmaker/internal/slices"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 )
@@ -46,7 +47,7 @@ type Repository struct {
 	Repository   string
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string, oldCRDVersion bool) (*Component, error) {
+func NewComponent(ctx context.Context, comp *konfluxv1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
 	// TODO: a helper to validate and parse the git url
 	platform, err := utils.GetGitPlatform(giturl)
 	if err != nil {
@@ -65,13 +66,13 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 		BaseComponent: base.BaseComponent{
 			Name:          comp.Name,
 			Namespace:     comp.Namespace,
-			Application:   comp.Spec.Application,
+			Application:   comp.Annotations[mmconst.MintMakerConvertedApplicationAnnotation],
 			Platform:      platform,
 			Host:          host,
 			GitURL:        giturl,
 			Repository:    repository,
 			Versions:      versions,
-			OldCRDVersion: oldCRDVersion,
+			OldCRDVersion: comp.Annotations[mmconst.MintMakerOldCRDAnnotation] == "true",
 		},
 		client: client,
 		ctx:    ctx,
@@ -108,24 +109,27 @@ func (c *Component) GetBranches() ([]string, error) {
 }
 
 func (c *Component) lookupSecret() (*corev1.Secret, error) {
-
-	secretList := &corev1.SecretList{}
-	opts := client.ListOption(&client.MatchingLabels{
-		"appstudio.redhat.com/credentials": "scm",
-		"appstudio.redhat.com/scm.host":    c.Host,
-	})
-
-	// find secrets that have the following labels:
-	//	- "appstudio.redhat.com/credentials": "scm"
-	//	- "appstudio.redhat.com/scm.host": <name of component host>
-	if err := c.client.List(c.ctx, secretList, client.InNamespace(c.Namespace), opts); err != nil {
-		return nil, fmt.Errorf("failed to list scm secrets in namespace %s: %w", c.Namespace, err)
+	labelSets := []map[string]string{
+		{mmconst.CredentialsLabel: "scm", mmconst.SCMHostLabel: c.Host},
+		{mmconst.CredentialsLabelLegacy: "scm", mmconst.SCMHostLabelLegacy: c.Host},
 	}
 
-	// filtering to get BasicAuth secrets and data is not empty
-	secrets := bslices.Filter(secretList.Items, func(secret corev1.Secret) bool {
-		return secret.Type == corev1.SecretTypeBasicAuth && len(secret.Data) > 0
-	})
+	// find secrets that have the following labels:
+	//	- "konflux-ci.dev/credentials": "scm"
+	//	- "konflux-ci.dev/scm.host": <name of component host>
+	// Migration note: Temporarily fetch secrets for both new and legacy labels.
+	var secrets []corev1.Secret
+	for _, labels := range labelSets {
+		secretList := &corev1.SecretList{}
+		if err := c.client.List(c.ctx, secretList, client.InNamespace(c.Namespace), client.MatchingLabels(labels)); err != nil {
+			return nil, fmt.Errorf("failed to list scm secrets in namespace %s: %w", c.Namespace, err)
+		}
+		// filtering to get BasicAuth secrets and data is not empty
+		secrets = append(secrets, bslices.Filter(secretList.Items, func(secret corev1.Secret) bool {
+			return secret.Type == corev1.SecretTypeBasicAuth && len(secret.Data) > 0
+		})...)
+	}
+
 	if len(secrets) == 0 {
 		return nil, fmt.Errorf("no secrets available for git host %s", c.Host)
 	}
@@ -136,8 +140,8 @@ func (c *Component) lookupSecret() (*corev1.Secret, error) {
 	var potentialMatches = make(map[int]int, len(secrets))
 
 	for index, secret := range secrets {
-		repositoryAnnotation, exists := secret.Annotations["appstudio.redhat.com/scm.repository"]
-		if !exists || repositoryAnnotation == "" {
+		repositoryAnnotation := utils.GetAnnotation(&secret, mmconst.SCMRepositoryAnnotation, mmconst.SCMRepositoryAnnotationLegacy)
+		if repositoryAnnotation == "" {
 			hostOnlySecrets = append(hostOnlySecrets, secret)
 			continue
 		}
