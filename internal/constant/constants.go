@@ -66,11 +66,11 @@ const (
 	// Remove when we stop supporting the old Component CRD.
 	MintMakerOldCRDAnnotation = "mintmaker.konflux-ci.dev/old-crd"
 
-	InternalSecretLabelLegacy = "appstudio.redhat.com/internal"
-	InternalSecretLabel       = "konflux-ci.dev/internal"
+	InternalSecretLabelLegacy = "appstudio.redhat.com/internal" //nolint:gosec // label name, not a credential
+	InternalSecretLabel       = "konflux-ci.dev/internal"       //nolint:gosec // label name, not a credential
 
-	CredentialsLabelLegacy = "appstudio.redhat.com/credentials"
-	CredentialsLabel       = "konflux-ci.dev/credentials"
+	CredentialsLabelLegacy = "appstudio.redhat.com/credentials" //nolint:gosec // label name, not a credential
+	CredentialsLabel       = "konflux-ci.dev/credentials"       //nolint:gosec // label name, not a credential
 
 	SCMHostLabelLegacy = "appstudio.redhat.com/scm.host"
 	SCMHostLabel       = "konflux-ci.dev/scm.host"
