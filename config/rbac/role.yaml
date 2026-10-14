@@ -39,6 +39,15 @@ rules:
   - watch
 - apiGroups:
   - appstudio.redhat.com
+  - konflux-ci.dev
+  resources:
+  - components
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - konflux-ci.dev
   resources:
   - dependencyupdatechecks
   verbs:
@@ -50,28 +59,19 @@ rules:
   - update
   - watch
 - apiGroups:
-  - appstudio.redhat.com
+  - konflux-ci.dev
   resources:
   - dependencyupdatechecks/finalizers
   verbs:
   - update
 - apiGroups:
-  - appstudio.redhat.com
+  - konflux-ci.dev
   resources:
   - dependencyupdatechecks/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - appstudio.redhat.com
-  - konflux-ci.dev
-  resources:
-  - components
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - security.openshift.io
   resourceNames:

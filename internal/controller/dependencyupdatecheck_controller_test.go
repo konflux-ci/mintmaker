@@ -233,13 +233,8 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				It("should create pipelineruns when the specified component name matches", func() {
 					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
 						{
-							Namespace: componentNamespace,
-							Applications: []mmv1alpha1.ApplicationSpec{
-								{
-									Application: "app",
-									Components:  []mmv1alpha1.Component{componentName},
-								},
-							},
+							Namespace:  componentNamespace,
+							Components: []mmv1alpha1.Component{componentName},
 						},
 					})
 					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
@@ -249,13 +244,8 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				It("should not create pipelineruns when the specified component name does not match", func() {
 					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
 						{
-							Namespace: componentNamespace,
-							Applications: []mmv1alpha1.ApplicationSpec{
-								{
-									Application: "app",
-									Components:  []mmv1alpha1.Component{"othercomp"},
-								},
-							},
+							Namespace:  componentNamespace,
+							Components: []mmv1alpha1.Component{"othercomp"},
 						},
 					})
 					Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))

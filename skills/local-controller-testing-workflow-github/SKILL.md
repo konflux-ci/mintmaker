@@ -98,11 +98,10 @@ kubectl get nodes -o wide
 `DependencyUpdateCheck.spec.namespaces` **filters** which Konflux Components are scanned:
 
 - **Namespace only** — all Components in that namespace.
-- **Namespace + `applications`** — only Components belonging to those applications.
-- **Namespace + `applications` + `components`** — only the named Components (see `assets/test-duc.yaml`).
+- **Namespace + `components`** — only the named Components (see `assets/test-duc.yaml`).
 - **Omitted / empty `namespaces`** — all Components cluster-wide (avoid for local testing).
 
-Leftover Components are only a problem when they still match your DUC filter. Prefer tightening the DUC spec (application/component names) over deleting unrelated Components.
+Leftover Components are only a problem when they still match your DUC filter. Prefer tightening the DUC spec (component names) over deleting unrelated Components.
 
 ```bash
 kubectl get components -n test-app
@@ -315,7 +314,7 @@ kubectl get pods -n mintmaker -o wide
 
 ### 3) Re-test after code changes
 
-The controller must be restarted. The DUC is processed once (`mintmaker.appstudio.redhat.com/processed: "true"`) — delete and re-apply to re-trigger:
+The controller must be restarted. The DUC is processed once (`mintmaker.konflux-ci.dev/processed: "true"`) — delete and re-apply to re-trigger:
 
 ```bash
 kubectl delete -f skills/local-controller-testing-workflow-github/assets/test-duc.yaml
@@ -346,7 +345,7 @@ Apply `test-duc.yaml` while `make run` is active. Within ~10s you should see thi
 ```bash
 # DUC marked processed (controller updates this before creating PipelineRuns)
 kubectl get dependencyupdatecheck test-dependency-check -n mintmaker \
-  -o jsonpath='{.metadata.annotations.mintmaker\.appstudio\.redhat\.com/processed}{"\n"}'
+  -o jsonpath='{.metadata.annotations.mintmaker\.konflux-ci\.dev/processed}{"\n"}'
 # expect: true
 
 kubectl get pipelineruns -n mintmaker -o wide
