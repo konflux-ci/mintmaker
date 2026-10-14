@@ -4,8 +4,8 @@ repos:
     rev: v0.49.1
     hooks:
       - id: markdownlint
-        # ava@8 (dev dep of markdownlint-cli) rejects Node 25; pin an LTS version.
-        language_version: 24.12.0
+        # Pin Node 24 LTS: ava@8 rejects 25; ini@7 needs >=24.15.0.
+        language_version: 24.15.0
         args: [--config, .markdownlint.json]
 
   - repo: local
