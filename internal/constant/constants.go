@@ -18,7 +18,7 @@ const (
 	// The namespace name where mintmaker is running
 	MintMakerNamespaceName = "mintmaker"
 	// Mintmaker will add processed annotation when the dependencyupdatecheck is processed by controller
-	MintMakerProcessedAnnotationName = "mintmaker.appstudio.redhat.com/processed"
+	MintMakerProcessedAnnotationName = "mintmaker.konflux-ci.dev/processed"
 	// Mintmaker can be disabled by disabled annotation in component
 	MintMakerDisabledAnnotationName = "mintmaker.appstudio.redhat.com/disabled"
 	// Label for the Kite token secret, used to find the secret in the namespace

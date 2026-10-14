@@ -1,4 +1,4 @@
-apiVersion: appstudio.redhat.com/v1alpha1
+apiVersion: konflux-ci.dev/v1alpha1
 kind: DependencyUpdateCheck
 metadata:
   name: test-dependency-check
@@ -6,7 +6,5 @@ metadata:
 spec:
   namespaces:
   - namespace: test-app
-    applications:
-    - application: test-application
-      components:
-      - test-backend
+    components:
+    - test-backend
