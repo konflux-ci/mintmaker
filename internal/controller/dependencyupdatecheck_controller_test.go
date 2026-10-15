@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,8 +30,10 @@ import (
 
 	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
+	"github.com/konflux-ci/mintmaker/internal/config"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 )
@@ -191,6 +194,116 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1 + expectedPipelineRuns))
 
 				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			Context("When Spec.Namespaces filters components", func() {
+
+				It("should create pipelineruns for components in the specified namespace", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{Namespace: componentNamespace},
+					})
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not create pipelineruns when the specified namespace has no matching components", func() {
+					createNamespace("other-namespace")
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{Namespace: "other-namespace"},
+					})
+					Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should create pipelineruns when the specified component name matches", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{
+							Namespace: componentNamespace,
+							Applications: []mmv1alpha1.ApplicationSpec{
+								{
+									Application: "app",
+									Components:  []mmv1alpha1.Component{componentName},
+								},
+							},
+						},
+					})
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not create pipelineruns when the specified component name does not match", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{
+							Namespace: componentNamespace,
+							Applications: []mmv1alpha1.ApplicationSpec{
+								{
+									Application: "app",
+									Components:  []mmv1alpha1.Component{"othercomp"},
+								},
+							},
+						},
+					})
+					Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+			})
+
+			Context("When Kite integration is enabled", func() {
+
+				const kiteSecretName = "kite-token"
+
+				kiteSecretKey := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: kiteSecretName}
+
+				buildStepNames := func(plr tektonv1.PipelineRun) []string {
+					var stepNames []string
+					for _, task := range plr.Spec.PipelineSpec.Tasks {
+						if task.Name != "build" || task.TaskSpec == nil {
+							continue
+						}
+						for _, step := range task.TaskSpec.Steps {
+							stepNames = append(stepNames, step.Name)
+						}
+					}
+					return stepNames
+				}
+
+				_ = BeforeEach(func() {
+					cfg := config.Get()
+					cfg.Kite.Enabled = true
+
+					createSecret(kiteSecretKey, corev1.SecretTypeOpaque, map[string][]byte{
+						"token": []byte("fake-kite-token"),
+					}, nil)
+					kiteSecret := getSecret(kiteSecretKey)
+					kiteSecret.Labels = map[string]string{KiteTokenSecretLabel: "true"}
+					Expect(k8sClient.Update(ctx, kiteSecret)).Should(Succeed())
+				})
+
+				_ = AfterEach(func() {
+					cfg := config.Get()
+					cfg.Kite.Enabled = false
+					deleteSecret(kiteSecretKey)
+				})
+
+				It("should add a log-analyzer step to the PipelineRun", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					Expect(buildStepNames(listPipelineRuns(MintMakerNamespaceName)[0])).To(ContainElement("log-analyzer"))
+
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not add a log-analyzer step when the kite token secret is missing", func() {
+					deleteSecret(kiteSecretKey)
+
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					Expect(buildStepNames(listPipelineRuns(MintMakerNamespaceName)[0])).NotTo(ContainElement("log-analyzer"))
+
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
 			})
 
 			Context("When getting a merged docker config for a pipelinerun", func() {
