@@ -199,9 +199,14 @@ func pipelineRunCompleted(pr *tektonv1.PipelineRun) bool {
 }
 
 // createPipelineRun creates and returns a new PipelineRun
-func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, currentBranch string, kiteSecretName string) (*tektonv1.PipelineRun, error) {
+func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context, name string, comp component.GitComponent, currentBranch string, kiteSecretName string, hostRulesSecretName string) (*tektonv1.PipelineRun, error) {
 
 	log := ctrllog.FromContext(ctx).WithName("createPipelineRun")
+	if hostRulesSecretName != "" {
+		if err := r.validateHostRulesSecret(ctx, hostRulesSecretName); err != nil {
+			return nil, err
+		}
+	}
 
 	var resources []client.Object
 	defer func() {
@@ -256,7 +261,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	renovateJsConfig := "module.exports = " + renovateConfig
+	renovateJsConfig := renovateConfigJS(renovateConfig, hostRulesSecretName != "")
 	// Create ConfigMap for Renovate global configuration
 	renovateConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -329,6 +334,11 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	}
 	secretOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"})
 	builder.WithSecret(name, "/etc/renovate/secret", secretItems, secretOpts)
+	if hostRulesSecretName != "" {
+		hostRulesItems := []corev1.KeyToPath{{Key: hostRulesSecretKey, Path: hostRulesSecretKey}}
+		hostRulesOpts := tekton.NewMountOptions().WithTaskName("build").WithStepNames([]string{"renovate"}).WithReadOnly(true)
+		builder.WithSecret(hostRulesSecretName, hostRulesMountPath, hostRulesItems, hostRulesOpts)
+	}
 
 	if rpmKeyErr == nil {
 		rpmSecretItems := []corev1.KeyToPath{
@@ -603,7 +613,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			}
 
 			plrName := fmt.Sprintf("renovate-%s-%s", timestamp, utils.RandomString(8))
-			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, branchName, kiteSecretName)
+			pipelinerun, err := r.createPipelineRun(ctx, plrName, comp, branchName, kiteSecretName, config.Get().HostRulesSecretName)
 			if err != nil {
 				branchLog.Error(err, "failed to create PipelineRun")
 				mintmakermetrics.CountScheduledRunFailure()
