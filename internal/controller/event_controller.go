@@ -16,6 +16,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -62,6 +63,59 @@ func (r *EventReconciler) markEventAsProcessed(ctx context.Context, event *corev
 		return err
 	}
 	return nil
+}
+
+// Reports whether gitComp's host and repository match the mintmaker git-source labels on the pod.
+func gitSourceMatchesPod(pod *corev1.Pod, gitComp component.GitComponent) bool {
+	podHost := utils.GetLabel(pod, mmconst.MintMakerGitHostLabel, mmconst.MintMakerGitHostLabelLegacy)
+	podRepo := utils.GetLabel(pod, mmconst.MintMakerRepositoryLabel, mmconst.MintMakerRepositoryLabelLegacy)
+
+	if gitComp.GetHost() != podHost {
+		return false
+	}
+	if utils.NormalizeLabelValue(gitComp.GetRepository()) != podRepo {
+		return false
+	}
+	return true
+}
+
+// Finds the corresponding Component for the given Pod and creates a GitComponent for it.
+func (r *EventReconciler) getGitComponent(ctx context.Context, pod *corev1.Pod) (component.GitComponent, error) {
+	componentName := utils.GetLabel(pod, mmconst.MintMakerComponentNameLabel, mmconst.MintMakerComponentNameLabelLegacy)
+	componentNamespace := utils.GetLabel(pod, mmconst.MintMakerComponentNamespaceLabel, mmconst.MintMakerComponentNamespaceLabelLegacy)
+
+	// Prefer the konflux Component when it exists and matches the pod's git-source labels.
+	var konfluxComp konfluxv1alpha1.Component
+	if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &konfluxComp); err != nil {
+		if err := ignoreMissingCRD(err); err != nil {
+			return nil, err
+		}
+	} else {
+		gitComp, err := r.NewGitComponent(ctx, &konfluxComp, r.Client)
+		if err != nil {
+			return nil, err
+		}
+		if gitSourceMatchesPod(pod, gitComp) {
+			return gitComp, nil
+		}
+	}
+
+	// Fallback to legacy Component if konflux was missing or mismatched.
+	// TODO: remove this when appstudio Components are decommissioned.
+	var appstudioComp appstudiov1alpha1.Component
+	if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &appstudioComp); err != nil {
+		return nil, err
+	}
+	converted := component.ToKonfluxComponent(&appstudioComp)
+	gitComp, err := r.NewGitComponent(ctx, converted, r.Client)
+	if err != nil {
+		return nil, err
+	}
+	if gitSourceMatchesPod(pod, gitComp) {
+		return gitComp, nil
+	}
+
+	return nil, errors.New("git source does not match pod labels")
 }
 
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch
@@ -199,35 +253,14 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			secret.Data = make(map[string][]byte)
 		}
 
-		componentName := utils.GetLabel(&pod, mmconst.MintMakerComponentNameLabel, mmconst.MintMakerComponentNameLabelLegacy)
-		componentNamespace := utils.GetLabel(&pod, mmconst.MintMakerComponentNamespaceLabel, mmconst.MintMakerComponentNamespaceLabelLegacy)
-
-		// Get the component
-		var comp konfluxv1alpha1.Component
-		if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &comp); err != nil {
-			if err := ignoreMissingCRD(err); err != nil {
-				errMessage = err.Error()
-				return ctrl.Result{}, err
-			}
-			var appstudioComp appstudiov1alpha1.Component
-			if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &appstudioComp); err != nil {
-				if apierrors.IsNotFound(err) {
-					// Component has gone, we can't proceed
-					return ctrl.Result{}, nil
-				}
-				errMessage = err.Error()
-				return ctrl.Result{}, err
-			}
-			converted := component.ToKonfluxComponent(&appstudioComp)
-			comp = *converted
-		}
-
-		// Create GitComponent from Component
-		gitComp, err := r.NewGitComponent(ctx, &comp, r.Client)
+		gitComp, err := r.getGitComponent(ctx, &pod)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Component has gone, we can't proceed
+				return ctrl.Result{}, nil
+			}
 			errMessage = err.Error()
-			// Do not requeue, the error is not related to the cluster issues
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 
 		// When this is a GitHub component, it also refreshes token if needed

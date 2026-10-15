@@ -32,6 +32,7 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 var _ = Describe("Event Controller", func() {
@@ -49,6 +50,8 @@ var _ = Describe("Event Controller", func() {
 				podName            = "test-pod"
 				secretName         = "test-secret"
 				volumeName         = "test-volume"
+				gitHost            = "github.com"
+				gitRepository      = "owner/testcomp"
 			)
 
 			var (
@@ -60,6 +63,8 @@ var _ = Describe("Event Controller", func() {
 				gt := GinkgoT()
 				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetHost().Return(gitHost).Maybe()
+					mockComp.EXPECT().GetRepository().Return(gitRepository).Maybe()
 					mockComp.EXPECT().GetToken().Return("fake-token", nil).Maybe()
 					return mockComp, nil
 				}
@@ -69,7 +74,7 @@ var _ = Describe("Event Controller", func() {
 
 				componentKey := types.NamespacedName{Name: componentName, Namespace: componentNamespace}
 				createComponent(
-					componentKey, crdVersion, "app", "https://github.com/testcomp.git", "gitrevision", "gitsourcecontext",
+					componentKey, crdVersion, "app", "https://"+gitHost+"/"+gitRepository+".git", "gitrevision", "gitsourcecontext",
 				)
 
 				pod = &corev1.Pod{
@@ -79,6 +84,8 @@ var _ = Describe("Event Controller", func() {
 						Labels: map[string]string{
 							MintMakerComponentNameLabel:      componentName,
 							MintMakerComponentNamespaceLabel: componentNamespace,
+							MintMakerGitHostLabel:            gitHost,
+							MintMakerRepositoryLabel:         utils.NormalizeLabelValue(gitRepository),
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -301,6 +308,8 @@ var _ = Describe("Event Controller", func() {
 				gt := GinkgoT()
 				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetHost().Return(gitHost).Maybe()
+					mockComp.EXPECT().GetRepository().Return(gitRepository).Maybe()
 					mockComp.EXPECT().GetToken().Return("", errors.New("token error")).Maybe()
 					return mockComp, nil
 				}
