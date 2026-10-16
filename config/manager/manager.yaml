@@ -78,7 +78,7 @@ spec:
         - name: RENOVATE_IMAGE
           valueFrom:
             fieldRef:
-              fieldPath: metadata.annotations['mintmaker.appstudio.redhat.com/renovate-image']
+              fieldPath: metadata.annotations['mintmaker.konflux-ci.dev/renovate-image']
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
