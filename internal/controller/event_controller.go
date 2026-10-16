@@ -16,6 +16,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -29,9 +30,12 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	component "github.com/konflux-ci/mintmaker/internal/component"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 // EventReconciler reconciles a Event object
@@ -50,7 +54,8 @@ func (r *EventReconciler) markEventAsProcessed(ctx context.Context, event *corev
 	}
 
 	original := patchEvent.DeepCopy()
-	patchEvent.Annotations["mintmaker.appstudio.redhat.com/processed"] = "true"
+	patchEvent.Annotations[mmconst.MintMakerProcessedAnnotationNameLegacy] = "true"
+	patchEvent.Annotations[mmconst.MintMakerProcessedAnnotationName] = "true"
 
 	patch := client.MergeFrom(original)
 
@@ -60,10 +65,64 @@ func (r *EventReconciler) markEventAsProcessed(ctx context.Context, event *corev
 	return nil
 }
 
+// Reports whether gitComp's host and repository match the mintmaker git-source labels on the pod.
+func gitSourceMatchesPod(pod *corev1.Pod, gitComp component.GitComponent) bool {
+	podHost := utils.GetLabel(pod, mmconst.MintMakerGitHostLabel, mmconst.MintMakerGitHostLabelLegacy)
+	podRepo := utils.GetLabel(pod, mmconst.MintMakerRepositoryLabel, mmconst.MintMakerRepositoryLabelLegacy)
+
+	if gitComp.GetHost() != podHost {
+		return false
+	}
+	if utils.NormalizeLabelValue(gitComp.GetRepository()) != podRepo {
+		return false
+	}
+	return true
+}
+
+// Finds the corresponding Component for the given Pod and creates a GitComponent for it.
+func (r *EventReconciler) getGitComponent(ctx context.Context, pod *corev1.Pod) (component.GitComponent, error) {
+	componentName := utils.GetLabel(pod, mmconst.MintMakerComponentNameLabel, mmconst.MintMakerComponentNameLabelLegacy)
+	componentNamespace := utils.GetLabel(pod, mmconst.MintMakerComponentNamespaceLabel, mmconst.MintMakerComponentNamespaceLabelLegacy)
+
+	// Prefer the konflux Component when it exists and matches the pod's git-source labels.
+	var konfluxComp konfluxv1alpha1.Component
+	if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &konfluxComp); err != nil {
+		if err := ignoreMissingCRD(err); err != nil {
+			return nil, err
+		}
+	} else {
+		gitComp, err := r.NewGitComponent(ctx, &konfluxComp, r.Client)
+		if err != nil {
+			return nil, err
+		}
+		if gitSourceMatchesPod(pod, gitComp) {
+			return gitComp, nil
+		}
+	}
+
+	// Fallback to legacy Component if konflux was missing or mismatched.
+	// TODO: remove this when appstudio Components are decommissioned.
+	var appstudioComp appstudiov1alpha1.Component
+	if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &appstudioComp); err != nil {
+		return nil, err
+	}
+	converted := component.ToKonfluxComponent(&appstudioComp)
+	gitComp, err := r.NewGitComponent(ctx, converted, r.Client)
+	if err != nil {
+		return nil, err
+	}
+	if gitSourceMatchesPod(pod, gitComp) {
+		return gitComp, nil
+	}
+
+	return nil, errors.New("git source does not match pod labels")
+}
+
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;update
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=components,verbs=get
+// +kubebuilder:rbac:groups=konflux-ci.dev,resources=components,verbs=get
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;patch
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns/status,verbs=patch
 
@@ -153,11 +212,14 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	log = log.WithValues(
-		"component", pod.Labels[MintMakerComponentNameLabel],
-		"componentNamespace", pod.Labels[MintMakerComponentNamespaceLabel],
+		"component", utils.GetLabel(&pod, mmconst.MintMakerComponentNameLabel, mmconst.MintMakerComponentNameLabelLegacy),
+		"componentNamespace", utils.GetLabel(&pod, mmconst.MintMakerComponentNamespaceLabel, mmconst.MintMakerComponentNamespaceLabelLegacy),
 		"pipelineRun", pod.Labels["tekton.dev/pipelineRun"],
-		"repository", strings.ReplaceAll(pod.Labels["mintmaker.appstudio.redhat.com/repository"], "_", "/"),
-		"gitHost", pod.Labels["mintmaker.appstudio.redhat.com/git-host"],
+		"repository", strings.ReplaceAll(
+			utils.GetLabel(&pod, mmconst.MintMakerRepositoryLabel, mmconst.MintMakerRepositoryLabelLegacy),
+			"_", "/",
+		),
+		"gitHost", utils.GetLabel(&pod, mmconst.MintMakerGitHostLabel, mmconst.MintMakerGitHostLabelLegacy),
 	)
 	ctx = ctrllog.IntoContext(ctx, log)
 	// Find the corresponding secret
@@ -191,26 +253,14 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			secret.Data = make(map[string][]byte)
 		}
 
-		componentName := pod.Labels[MintMakerComponentNameLabel]
-		componentNamespace := pod.Labels[MintMakerComponentNamespaceLabel]
-
-		// Get the component
-		var comp appstudiov1alpha1.Component
-		if err := r.Get(ctx, client.ObjectKey{Namespace: componentNamespace, Name: componentName}, &comp); err != nil {
+		gitComp, err := r.getGitComponent(ctx, &pod)
+		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// Component has gone, we can't proceed
 				return ctrl.Result{}, nil
 			}
 			errMessage = err.Error()
 			return ctrl.Result{}, err
-		}
-
-		// Create GitComponent from Component
-		gitComp, err := r.NewGitComponent(ctx, &comp, r.Client)
-		if err != nil {
-			errMessage = err.Error()
-			// Do not requeue, the error is not related to the cluster issues
-			return ctrl.Result{}, nil
 		}
 
 		// When this is a GitHub component, it also refreshes token if needed
@@ -253,7 +303,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if evt.Reason != "FailedMount" {
 					return false
 				}
-				if _, exists := evt.Annotations["mintmaker.appstudio.redhat.com/processed"]; exists {
+				if utils.HasAnnotation(evt, mmconst.MintMakerProcessedAnnotationName, mmconst.MintMakerProcessedAnnotationNameLegacy) {
 					return false
 				}
 				return true
