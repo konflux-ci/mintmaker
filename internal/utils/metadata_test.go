@@ -58,6 +58,18 @@ func TestGetLabel(t *testing.T) {
 			oldKey:   "old-label",
 			expected: "old-label-value",
 		},
+		{
+			name: "new label with empty value",
+			obj: &metav1.ObjectMeta{
+				Labels: map[string]string{
+					"new-label": "",
+					"old-label": "old-label-value",
+				},
+			},
+			newKey:   "new-label",
+			oldKey:   "old-label",
+			expected: "",
+		},
 	}
 
 	for _, tc := range tests {
@@ -108,6 +120,18 @@ func TestGetAnnotation(t *testing.T) {
 			oldKey:   "old-annotation",
 			expected: "old-annotation-value",
 		},
+		{
+			name: "new annotation with empty value",
+			obj: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"new-annotation": "",
+					"old-annotation": "old-annotation-value",
+				},
+			},
+			newKey:   "new-annotation",
+			oldKey:   "old-annotation",
+			expected: "",
+		},
 	}
 
 	for _, tc := range tests {
@@ -152,6 +176,28 @@ func TestHasAnnotation(t *testing.T) {
 			obj: &metav1.ObjectMeta{
 				Annotations: map[string]string{
 					"old-annotation": "old-annotation-value",
+				},
+			},
+			newKey:   "new-annotation",
+			oldKey:   "old-annotation",
+			expected: true,
+		},
+		{
+			name: "new annotation present but empty",
+			obj: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"new-annotation": "",
+				},
+			},
+			newKey:   "new-annotation",
+			oldKey:   "old-annotation",
+			expected: true,
+		},
+		{
+			name: "old annotation present but empty",
+			obj: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"old-annotation": "",
 				},
 			},
 			newKey:   "new-annotation",
