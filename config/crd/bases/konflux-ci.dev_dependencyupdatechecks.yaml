@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: dependencyupdatechecks.appstudio.redhat.com
+  name: dependencyupdatechecks.konflux-ci.dev
 spec:
-  group: appstudio.redhat.com
+  group: konflux-ci.dev
   names:
     kind: DependencyUpdateCheck
     listKind: DependencyUpdateCheckList
@@ -28,7 +28,7 @@ spec:
               one Tekton `PipelineRun` that scans the repository for dependency updates using Renovate.
 
           Annotations:
-            - `mintmaker.appstudio.redhat.com/processed`: set by the controller when the
+            - `mintmaker.konflux-ci.dev/processed`: set by the controller when the
               DependencyUpdateCheck is processed, to avoid reprocessing the same CR.
         properties:
           apiVersion:
@@ -52,45 +52,26 @@ spec:
             description: |-
               DependencyUpdateCheckSpec filters which Konflux Components will be scanned.
               If `namespaces` is empty, MintMaker scans all Components discoverable to the controller.
-              If provided, MintMaker only scans Components that match the namespace/application/component filters.
+              If provided, MintMaker only scans Components that match the namespace/components filters.
             properties:
               namespaces:
                 description: |-
                   Specifies the list of namespaces for which to run MintMaker.
                   If omitted, MintMaker will run for all namespaces.
                 items:
-                  description: NamespaceSpec scopes MintMaker to specific Applications
+                  description: NamespaceSpec scopes MintMaker to specific Components
                     within a Kubernetes namespace.
                   properties:
-                    applications:
+                    components:
                       description: |-
-                        Specifies the list of Konflux applications in a namespace for which to run MintMaker.
-                        If omitted, MintMaker will run for all namespace's applications.
+                        Specifies the list of components for which to run MintMaker.
+                        If omitted, MintMaker will run for all components.
                       items:
-                        description: ApplicationSpec scopes MintMaker to specific
-                          Components within a single Konflux Application.
-                        properties:
-                          application:
-                            description: |-
-                              Specifies the name of the Konflux application for which to run Mintmaker.
-                              For more details see <a href="https://github.com/konflux-ci/architecture/blob/main/architecture/core/hybrid-application-service.md">Konflux Application Service</a>.
-                              Required.
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                            type: string
-                          components:
-                            description: |-
-                              Specifies the list of components of an application for which to run MintMaker.
-                              If omitted, MintMaker will run for all application's components.
-                            items:
-                              description: Component represents a Component name within
-                                a Konflux Application.
-                              maxLength: 63
-                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                              type: string
-                            type: array
-                        required:
-                        - application
-                        type: object
+                        description: Component represents a Component name within
+                          Konflux.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
                       type: array
                     namespace:
                       description: |-

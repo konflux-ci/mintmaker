@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Get only components that match a given namespace/application/componentname
+// Get only components that match a given namespace/component name
 func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client) ([]appstudiov1alpha1.Component, error) {
 	components := []appstudiov1alpha1.Component{}
 	err := error(nil)
@@ -36,31 +36,17 @@ func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.Namespac
 		if err := apiClient.List(ctx, namespaceComponentList, listOps); err != nil {
 			return nil, err
 		}
-		// No applications specified -> add all Namespace components, start processing next namespace
-		if len(namespace.Applications) == 0 {
+		// No components specified -> add all namespace components, start processing next namespace
+		if len(namespace.Components) == 0 {
 			components = append(components, namespaceComponentList.Items...)
 			continue
 		}
-		// Applications specified -> iterate and filter by application
-		for _, application := range namespace.Applications {
-			appMatchingComponents := []appstudiov1alpha1.Component{}
+		// Components specified -> add components with matching names
+		for _, filterComponent := range namespace.Components {
 			for _, component := range namespaceComponentList.Items {
-				if application.Application == component.Spec.Application {
-					appMatchingComponents = append(appMatchingComponents, component)
-				}
-			}
-			// No components specified for an application -> add all application components, start processing next application
-			if len(application.Components) == 0 {
-				components = append(components, appMatchingComponents...)
-				continue
-			}
-			// Components specified -> add components with matching names
-			for _, filterComponent := range application.Components {
-				for _, component := range appMatchingComponents {
-					if filterComponent == mmv1alpha1.Component(component.Name) {
-						components = append(components, component)
-						break
-					}
+				if filterComponent == mmv1alpha1.Component(component.Name) {
+					components = append(components, component)
+					break
 				}
 			}
 		}
