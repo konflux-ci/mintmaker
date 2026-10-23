@@ -27,9 +27,10 @@ import (
 	knativeapis "knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 )
 
@@ -153,6 +154,7 @@ func getSecret(resourceKey types.NamespacedName) *corev1.Secret {
 }
 
 func createComponent(resourceKey types.NamespacedName, crdVersion, application, gitURL, gitRevision, gitSourceContext string) {
+	// TODO: remove this when we stop supporting the old model
 	if crdVersion == "v1" {
 		component := &appstudiov1alpha1.Component{
 			TypeMeta: metav1.TypeMeta{
@@ -162,9 +164,6 @@ func createComponent(resourceKey types.NamespacedName, crdVersion, application, 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      resourceKey.Name,
 				Namespace: resourceKey.Namespace,
-				Annotations: map[string]string{
-					"appstudio.openshift.io/component-model": crdVersion,
-				},
 			},
 			Spec: appstudiov1alpha1.ComponentSpec{
 				ComponentName: resourceKey.Name,
@@ -181,59 +180,47 @@ func createComponent(resourceKey types.NamespacedName, crdVersion, application, 
 			},
 		}
 		Expect(k8sClient.Create(ctx, component)).Should(Succeed())
-		getComponent(resourceKey)
-	} else {
-		component := &appstudiov1alpha1.Component{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "appstudio.redhat.com/v1alpha1",
-				Kind:       "Component",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      resourceKey.Name,
-				Namespace: resourceKey.Namespace,
-				Annotations: map[string]string{
-					"appstudio.openshift.io/component-model": crdVersion,
-				},
-			},
-			Spec: appstudiov1alpha1.ComponentSpec{
-				Source: appstudiov1alpha1.ComponentSource{
-					ComponentSourceUnion: appstudiov1alpha1.ComponentSourceUnion{
-						GitURL: gitURL,
-						Versions: []appstudiov1alpha1.ComponentVersion{
-							{
-								Name:     "default",
-								Revision: gitRevision,
-							},
-							{
-								Name:     "v1",
-								Revision: gitRevision + "-v1",
-							},
-							{
-								Name:     "v2",
-								Revision: gitRevision + "-v2",
-							},
-						},
-					},
-				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, component)).Should(Succeed())
-
-		createdComponent := getComponent(resourceKey)
-		createdComponent.Status = appstudiov1alpha1.ComponentStatus{
-			Versions: []appstudiov1alpha1.ComponentVersionStatus{
-				{Name: "default", Revision: gitRevision, OnboardingStatus: "succeeded"},
-				{Name: "v1", Revision: gitRevision + "-v1", OnboardingStatus: "succeeded"},
-				{Name: "v2", Revision: gitRevision + "-v2", OnboardingStatus: "succeeded"},
-			},
-		}
-		Expect(k8sClient.Status().Update(ctx, createdComponent)).Should(Succeed())
-		getComponent(resourceKey)
+		getAppstudioComponent(resourceKey)
+		return
 	}
+
+	component := &konfluxv1alpha1.Component{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "konflux-ci.dev/v1alpha1",
+			Kind:       "Component",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resourceKey.Name,
+			Namespace: resourceKey.Namespace,
+		},
+		Spec: konfluxv1alpha1.ComponentSpec{
+			Source: konfluxv1alpha1.ComponentSource{
+				GitURL: gitURL,
+				Versions: []konfluxv1alpha1.ComponentVersion{
+					{Name: "default", Revision: gitRevision},
+					{Name: "v1", Revision: gitRevision + "-v1"},
+					{Name: "v2", Revision: gitRevision + "-v2"},
+				},
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, component)).Should(Succeed())
+	getKonfluxComponent(resourceKey)
 }
 
-func getComponent(resourceKey types.NamespacedName) *appstudiov1alpha1.Component {
+func getAppstudioComponent(resourceKey types.NamespacedName) *appstudiov1alpha1.Component {
 	component := &appstudiov1alpha1.Component{}
+	Eventually(func() bool {
+		if err := k8sClient.Get(ctx, resourceKey, component); err != nil {
+			return false
+		}
+		return true
+	}, timeout, interval).Should(BeTrue())
+	return component
+}
+
+func getKonfluxComponent(resourceKey types.NamespacedName) *konfluxv1alpha1.Component {
+	component := &konfluxv1alpha1.Component{}
 	Eventually(func() bool {
 		if err := k8sClient.Get(ctx, resourceKey, component); err != nil {
 			return false
@@ -245,31 +232,46 @@ func getComponent(resourceKey types.NamespacedName) *appstudiov1alpha1.Component
 
 // deleteComponent deletes the specified component resource and verifies it was properly deleted
 func deleteComponent(resourceKey types.NamespacedName) {
-	component := &appstudiov1alpha1.Component{}
+	appstudioComponent := &appstudiov1alpha1.Component{}
+	konfluxComponent := &konfluxv1alpha1.Component{}
 
-	// Check if the component exists
-	if err := k8sClient.Get(ctx, resourceKey, component); k8sErrors.IsNotFound(err) {
-		return
-	}
-
-	// Delete
+	// Delete AppStudio component
 	Eventually(func() error {
-		if err := k8sClient.Get(ctx, resourceKey, component); err != nil {
+		if err := k8sClient.Get(ctx, resourceKey, appstudioComponent); err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
-		return k8sClient.Delete(ctx, component)
+		return k8sClient.Delete(ctx, appstudioComponent)
 	}, timeout, interval).Should(Succeed())
 
-	// Wait for delete to finish
+	// Wait for AppStudio delete to finish
 	Eventually(func() bool {
-		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, component))
+		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, appstudioComponent))
+	}, timeout, interval).Should(BeTrue())
+
+	// Delete Konflux component
+	Eventually(func() error {
+		if err := k8sClient.Get(ctx, resourceKey, konfluxComponent); err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		return k8sClient.Delete(ctx, konfluxComponent)
+	}, timeout, interval).Should(Succeed())
+
+	// Wait for Konflux delete to finish
+	Eventually(func() bool {
+		return k8sErrors.IsNotFound(k8sClient.Get(ctx, resourceKey, konfluxComponent))
 	}, timeout, interval).Should(BeTrue())
 }
 
 func createDependencyUpdateCheck(resourceKey types.NamespacedName, processed bool, namespaces []mmv1alpha1.NamespaceSpec) {
 	annotations := map[string]string{}
 	if processed {
-		annotations[MintMakerProcessedAnnotationName] = "true"
+		annotations[MintMakerProcessedAnnotationNameLegacy] = "true"
 	}
 
 	dependencyUpdateCheck := &mmv1alpha1.DependencyUpdateCheck{

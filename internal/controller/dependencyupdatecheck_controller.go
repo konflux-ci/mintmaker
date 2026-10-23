@@ -35,6 +35,7 @@ import (
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
@@ -45,8 +46,6 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/tekton"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 )
-
-const InternalSecretLabelName = "appstudio.redhat.com/internal"
 
 // DependencyUpdateCheckReconciler reconciles a DependencyUpdateCheck object
 type DependencyUpdateCheckReconciler struct {
@@ -119,7 +118,7 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 			continue // Skip Secrets with type other than DockerConfigJson
 		}
 
-		if value, exists := secret.Labels[InternalSecretLabelName]; exists && value == "true" {
+		if utils.GetLabel(&secret, mmconst.InternalSecretLabel, mmconst.InternalSecretLabelLegacy) == "true" {
 			continue // Skip Secrets labeled as internal
 		}
 
@@ -162,22 +161,27 @@ func (r *DependencyUpdateCheckReconciler) getMergedDockerConfigJson(ctx context.
 func (r *DependencyUpdateCheckReconciler) hasActivePipelineRun(ctx context.Context, host, repository, branch string) (bool, error) {
 	log := ctrllog.FromContext(ctx)
 
-	pipelineRuns := &tektonv1.PipelineRunList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(mmconst.MintMakerNamespaceName),
-		client.MatchingLabels{
-			mmconst.MintMakerRepoBranchHashLabel: utils.RepoBranchHash(host, repository, branch),
-		},
+	hash := utils.RepoBranchHash(host, repository, branch)
+	labelKeys := []string{
+		mmconst.MintMakerRepoBranchHashLabel,
+		mmconst.MintMakerRepoBranchHashLabelLegacy,
 	}
 
-	if err := r.Client.List(ctx, pipelineRuns, listOpts...); err != nil {
-		return false, err
-	}
-
-	for _, pr := range pipelineRuns.Items {
-		if !pipelineRunCompleted(&pr) {
-			log.Info("found active PipelineRun", "pipelineRun", pr.Name)
-			return true, nil
+	// Check for active PipelineRuns using both new and legacy labels
+	for _, labelKey := range labelKeys {
+		pipelineRuns := &tektonv1.PipelineRunList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(mmconst.MintMakerNamespaceName),
+			client.MatchingLabels{labelKey: hash},
+		}
+		if err := r.Client.List(ctx, pipelineRuns, listOpts...); err != nil {
+			return false, err
+		}
+		for _, pr := range pipelineRuns.Items {
+			if !pipelineRunCompleted(&pr) {
+				log.Info("found active PipelineRun", "pipelineRun", pr.Name)
+				return true, nil
+			}
 		}
 	}
 
@@ -300,14 +304,23 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	// Creating the pipelineRun definition
 	builder := tekton.NewPipelineRunBuilder(name, mmconst.MintMakerNamespaceName).
 		WithLabels(map[string]string{
-			"mintmaker.appstudio.redhat.com/application":  comp.GetApplication(),
-			"mintmaker.appstudio.redhat.com/component":    comp.GetName(),
-			"mintmaker.appstudio.redhat.com/namespace":    comp.GetNamespace(),
-			"mintmaker.appstudio.redhat.com/git-platform": comp.GetPlatform(), // (github, gitlab)
-			"mintmaker.appstudio.redhat.com/git-host":     comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
-			"mintmaker.appstudio.redhat.com/repository":   utils.NormalizeLabelValue(comp.GetRepository()),
-			"mintmaker.appstudio.redhat.com/branch":       utils.NormalizeLabelValue(currentBranch),
-			mmconst.MintMakerRepoBranchHashLabel:          utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
+			mmconst.MintMakerApplicationLabel:        comp.GetApplication(),
+			mmconst.MintMakerComponentNameLabel:      comp.GetName(),
+			mmconst.MintMakerComponentNamespaceLabel: comp.GetNamespace(),
+			mmconst.MintMakerGitPlatformLabel:        comp.GetPlatform(), // (github, gitlab)
+			mmconst.MintMakerGitHostLabel:            comp.GetHost(),     // github.com, gitlab.com, gitlab.other.com
+			mmconst.MintMakerRepositoryLabel:         utils.NormalizeLabelValue(comp.GetRepository()),
+			mmconst.MintMakerBranchLabel:             utils.NormalizeLabelValue(currentBranch),
+			mmconst.MintMakerRepoBranchHashLabel:     utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
+			// Legacy labels. To be removed after the migration to the new domain is complete.
+			mmconst.MintMakerApplicationLabelLegacy:        comp.GetApplication(),
+			mmconst.MintMakerComponentNameLabelLegacy:      comp.GetName(),
+			mmconst.MintMakerComponentNamespaceLabelLegacy: comp.GetNamespace(),
+			mmconst.MintMakerGitPlatformLabelLegacy:        comp.GetPlatform(),
+			mmconst.MintMakerGitHostLabelLegacy:            comp.GetHost(),
+			mmconst.MintMakerRepositoryLabelLegacy:         utils.NormalizeLabelValue(comp.GetRepository()),
+			mmconst.MintMakerBranchLabelLegacy:             utils.NormalizeLabelValue(currentBranch),
+			mmconst.MintMakerRepoBranchHashLabelLegacy:     utils.RepoBranchHash(comp.GetHost(), comp.GetRepository(), currentBranch),
 		}).
 		WithTimeouts(nil)
 	builder.WithServiceAccount("mintmaker-controller-manager")
@@ -448,6 +461,7 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=components,verbs=get;list;watch
+// +kubebuilder:rbac:groups=konflux-ci.dev,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns/finalizers,verbs=update
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns/status,verbs=get;update;patch
@@ -476,7 +490,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	// If the DependencyUpdateCheck has been handled before, skip it
-	if value, exists := dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationName]; exists && value == "true" {
+	if value, exists := dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationNameLegacy]; exists && value == "true" {
 		log.Info(fmt.Sprintf("DependencyUpdateCheck has been processed: %v", req.NamespacedName))
 		return ctrl.Result{}, nil
 	}
@@ -491,7 +505,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	if dependencyupdatecheck.Annotations == nil {
 		dependencyupdatecheck.Annotations = map[string]string{}
 	}
-	dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationName] = "true"
+	dependencyupdatecheck.Annotations[mmconst.MintMakerProcessedAnnotationNameLegacy] = "true"
 
 	err = r.Client.Update(ctx, dependencyupdatecheck)
 	if err != nil {
@@ -499,7 +513,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
-	var gatheredComponents []appstudiov1alpha1.Component
+	var gatheredComponents []konfluxv1alpha1.Component
 	if len(dependencyupdatecheck.Spec.Namespaces) > 0 {
 		log.Info(fmt.Sprintf("Following components are specified: %v", dependencyupdatecheck.Spec.Namespaces))
 		gatheredComponents, err = getFilteredComponents(ctx, dependencyupdatecheck.Spec.Namespaces, r.Client)
@@ -508,20 +522,29 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 			return ctrl.Result{}, err
 		}
 	} else {
-		allComponents := &appstudiov1alpha1.ComponentList{}
-		if err := r.Client.List(ctx, allComponents, &client.ListOptions{}); err != nil {
-			log.Error(err, "failed to list Components")
-			return ctrl.Result{}, err
+		konfluxList := &konfluxv1alpha1.ComponentList{}
+		if err := r.Client.List(ctx, konfluxList); err != nil {
+			if err := ignoreMissingCRD(err); err != nil {
+				log.Error(err, "failed to list Components")
+				return ctrl.Result{}, err
+			}
 		}
-		gatheredComponents = allComponents.Items
+		legacyList := &appstudiov1alpha1.ComponentList{}
+		if err := r.Client.List(ctx, legacyList); err != nil {
+			if err := ignoreMissingCRD(err); err != nil {
+				log.Error(err, "failed to list legacy Components")
+				return ctrl.Result{}, err
+			}
+		}
+		gatheredComponents = mergeKonfluxAndLegacyComponents(konfluxList.Items, legacyList.Items)
 	}
 
 	log.Info(fmt.Sprintf("%d components will be processed", len(gatheredComponents)))
 
 	// Filter out components which have mintmaker disabled
-	componentList := []appstudiov1alpha1.Component{}
+	componentList := []konfluxv1alpha1.Component{}
 	for _, component := range gatheredComponents {
-		if value, exists := component.Annotations[mmconst.MintMakerDisabledAnnotationName]; !exists || value != "true" {
+		if utils.GetAnnotation(&component, mmconst.MintMakerDisabledAnnotationName, mmconst.MintMakerDisabledAnnotationNameLegacy) != "true" {
 			componentList = append(componentList, component)
 		}
 	}
@@ -536,17 +559,23 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	kiteSecretName := ""
 	if cfg := config.Get(); cfg.Kite.Enabled {
 		secretList := &corev1.SecretList{}
-		err := r.Client.List(ctx, secretList,
-			client.InNamespace(mmconst.MintMakerNamespaceName),
-			client.MatchingLabels{mmconst.KiteTokenSecretLabel: "true"},
-		)
-		if err != nil {
-			log.Error(err, "Kite token secret lookup failed - skipping Kite integration")
-		} else if len(secretList.Items) == 0 {
+		for _, label := range []string{mmconst.KiteTokenSecretLabel, mmconst.KiteTokenSecretLabelLegacy} {
+			err := r.Client.List(ctx, secretList,
+				client.InNamespace(mmconst.MintMakerNamespaceName),
+				client.MatchingLabels{label: "true"},
+			)
+			if err != nil {
+				log.Error(err, "Kite token secret lookup failed - skipping Kite integration")
+				break
+			}
+			if len(secretList.Items) > 0 {
+				kiteSecretName = secretList.Items[0].Name
+				log.Info("Kite token secret found - using it", "secretName", kiteSecretName)
+				break
+			}
+		}
+		if kiteSecretName == "" {
 			log.Info("Kite token secret not found - skipping Kite integration")
-		} else {
-			kiteSecretName = secretList.Items[0].Name
-			log.Info("Kite token secret found - using it", "secretName", kiteSecretName)
 		}
 	}
 
@@ -554,12 +583,12 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 	processedComponents := make([]string, 0)
 
 	timestamp := time.Now().UTC().Format("01021504") // MMDDhhmm, from Go's time formatting reference date "20060102150405"
-	for _, appstudioComponent := range componentList {
-		compLog := log.WithValues("component", appstudioComponent.Name,
-			"componentNamespace", appstudioComponent.Namespace)
+	for _, konfluxComponent := range componentList {
+		compLog := log.WithValues("component", konfluxComponent.Name,
+			"componentNamespace", konfluxComponent.Namespace)
 		ctx = ctrllog.IntoContext(ctx, compLog)
 
-		comp, err := r.NewGitComponent(ctx, &appstudioComponent, r.Client)
+		comp, err := r.NewGitComponent(ctx, &konfluxComponent, r.Client)
 		if err != nil {
 			compLog.Error(err, "failed to handle component")
 			continue
@@ -567,7 +596,7 @@ func (r *DependencyUpdateCheckReconciler) Reconcile(ctx context.Context, req ctr
 
 		branches, err := comp.GetBranches()
 		if err != nil {
-			compLog.Info("couldn't find versions which are branches for component", "component", appstudioComponent.Name, "err", err)
+			compLog.Info("couldn't find versions which are branches for component", "component", konfluxComponent.Name, "err", err)
 			continue
 		}
 

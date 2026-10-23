@@ -31,10 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 
 	"github.com/konflux-ci/mintmaker/internal/component/base"
 	"github.com/konflux-ci/mintmaker/internal/config"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
@@ -84,7 +85,7 @@ func getAppIDAndKey(ctx context.Context, client client.Client) (int64, []byte, e
 	return ghAppID, ghAppPrivateKey, nil
 }
 
-func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client client.Client, giturl string, versions []string, oldCRDVersion bool) (*Component, error) {
+func NewComponent(ctx context.Context, comp *konfluxv1alpha1.Component, client client.Client, giturl string, versions []string) (*Component, error) {
 	appID, appPrivateKey, err := getAppIDAndKey(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub APP ID and private key: %w", err)
@@ -107,13 +108,13 @@ func NewComponent(ctx context.Context, comp *appstudiov1alpha1.Component, client
 		BaseComponent: base.BaseComponent{
 			Name:          comp.Name,
 			Namespace:     comp.Namespace,
-			Application:   comp.Spec.Application,
+			Application:   comp.Annotations[mmconst.MintMakerConvertedApplicationAnnotation],
 			Platform:      platform,
 			Host:          host,
 			GitURL:        giturl,
 			Repository:    repository,
 			Versions:      versions,
-			OldCRDVersion: oldCRDVersion,
+			OldCRDVersion: comp.Annotations[mmconst.MintMakerOldCRDAnnotation] == "true",
 		},
 		AppID:         appID,
 		AppPrivateKey: appPrivateKey,

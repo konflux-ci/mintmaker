@@ -557,7 +557,7 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 						Name: "NAMESPACE",
 						ValueFrom: &corev1.EnvVarSource{
 							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/namespace']",
+								FieldPath: "metadata.labels['mintmaker.konflux-ci.dev/namespace']",
 							},
 						},
 					},
@@ -565,7 +565,7 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 						Name: "GIT_HOST",
 						ValueFrom: &corev1.EnvVarSource{
 							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/git-host']",
+								FieldPath: "metadata.labels['mintmaker.konflux-ci.dev/git-host']",
 							},
 						},
 					},
@@ -573,7 +573,7 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 						Name: "REPOSITORY",
 						ValueFrom: &corev1.EnvVarSource{
 							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/repository']",
+								FieldPath: "metadata.labels['mintmaker.konflux-ci.dev/repository']",
 							},
 						},
 					},
@@ -581,7 +581,7 @@ func (b *PipelineRunBuilder) WithKiteIntegration(kiteAPIURL string) *PipelineRun
 						Name: "BRANCH",
 						ValueFrom: &corev1.EnvVarSource{
 							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.labels['mintmaker.appstudio.redhat.com/branch']",
+								FieldPath: "metadata.labels['mintmaker.konflux-ci.dev/branch']",
 							},
 						},
 					},
