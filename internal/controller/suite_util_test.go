@@ -274,7 +274,7 @@ func createDependencyUpdateCheck(resourceKey types.NamespacedName, processed boo
 
 	dependencyUpdateCheck := &mmv1alpha1.DependencyUpdateCheck{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "appstudio.redhat.com/v1alpha1",
+			APIVersion: "konflux-ci.dev/v1alpha1",
 			Kind:       "DependencyUpdateCheck",
 		},
 		ObjectMeta: metav1.ObjectMeta{
