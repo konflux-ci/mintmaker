@@ -20,6 +20,7 @@
   "configMigration": true,
   "containerVulnerabilityAlerts": true,
   "rpmVulnerabilityAlerts": true,
+  "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "enabled": true
   },
