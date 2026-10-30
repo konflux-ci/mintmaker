@@ -413,7 +413,12 @@ func (b *PipelineRunBuilder) WithSecret(name, mountPath string, items []corev1.K
 		if task.Name == opts.TaskName && task.TaskSpec != nil {
 			// Generate unique volume name using random string to avoid conflicts
 			// when the same secret is mounted multiple times
-			volumeName := fmt.Sprintf("secret-%s-%s", sanitizeVolumeName(name), utils.RandomString(8))
+			const maxSecretNameLength = 63 - len("secret--") - 8
+			sanitizedName := sanitizeVolumeName(name)
+			if len(sanitizedName) > maxSecretNameLength {
+				sanitizedName = sanitizedName[:maxSecretNameLength]
+			}
+			volumeName := fmt.Sprintf("secret-%s-%s", sanitizedName, utils.RandomString(8))
 			volume := corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
