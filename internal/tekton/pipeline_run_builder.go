@@ -245,6 +245,10 @@ func NewPipelineRunBuilder(name, namespace string) *PipelineRunBuilder {
 													Name:  "RENOVATE_X_GITLAB_AUTO_MERGEABLE_CHECK_ATTEMPS",
 													Value: "7",
 												},
+												{
+													Name:  "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE",
+													Value: "/var/cache/rpm-lockfile-dnf-cache",
+												},
 											},
 										},
 										{
