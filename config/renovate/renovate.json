@@ -242,7 +242,9 @@
     "^refresh-rpm-lockfiles -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$",
     "^update_artifacts_lockfile -f \"\\$RENOVATE_POST_UPGRADE_COMMAND_DATA_FILE\"$",
     "^npm ci$",
-    "^npm run test:ci -- --updateSnapshot$"
+    "^npm run test:ci -- --updateSnapshot$",
+    "^npm run build$",
+    "^npm run test:integration -- --updateSnapshot$"
   ],
   "updateNotScheduled": false,
   "dependencyDashboard": false,
