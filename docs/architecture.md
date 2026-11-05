@@ -96,6 +96,7 @@ Loaded by [internal/config](../internal/config/) from `MINTMAKER_CONFIG_PATH` (d
 
 - **GitHub**: installation token TTL and minimum validity before refresh.
 - **Kite**: optional post-run log analysis (`enabled`, `api-url`).
+- **Global host rules**: optional `host-rules-secret-name` referencing a Secret in `mintmaker`. Each new PipelineRun validates and mounts the Secret for Renovate; see [global-host-rules.md](global-host-rules.md).
 
 ### Renovate config
 

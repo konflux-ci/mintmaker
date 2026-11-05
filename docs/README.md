@@ -7,6 +7,7 @@
 | Understand the project quickly | [README.md](../README.md) |
 | Develop or modify the operator | [contributing.md](contributing.md) |
 | Learn how controllers and CRDs fit together | [architecture.md](architecture.md) |
+| Configure credentials for private package services | [global-host-rules.md](global-host-rules.md) |
 | Test changes in Konflux stage | [developer.md](developer.md#on-demand-runs-in-the-stage-environment) |
 | Understand how releases reach production | [automated-release-workflow.md](automated-release-workflow.md) |
 | Run a manual release / promotion | [developer.md](developer.md#release-process) |
@@ -27,6 +28,7 @@
 
 - **[developer.md](developer.md)** — On-demand Renovate jobs in stage, manual release checklist, infra-deployments promotion.
 - **[automated-release-workflow.md](automated-release-workflow.md)** — How Konflux builds update `infra-deployments` for dev/staging and promote to production.
+- **[global-host-rules.md](global-host-rules.md)** — Shared Secret-backed Renovate credentials and rotation.
 
 ### Repository root
 

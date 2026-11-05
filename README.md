@@ -18,6 +18,7 @@ Supported Git hosts: **GitHub**, **GitLab**, and **Forgejo**. See [docs/architec
 | [docs/contributing.md](docs/contributing.md) | **Development** — prerequisites, commands, conventions, PR checks |
 | [docs/README.md](docs/README.md) | Index of all documentation |
 | [docs/architecture.md](docs/architecture.md) | Controllers, CRDs, and data flow |
+| [docs/global-host-rules.md](docs/global-host-rules.md) | Shared credentials for private package services |
 | [docs/developer.md](docs/developer.md) | Stage testing and manual release |
 | [docs/automated-release-workflow.md](docs/automated-release-workflow.md) | Automated promotion via infra-deployments |
 | [AGENTS.md](AGENTS.md) | AI coding agents only |

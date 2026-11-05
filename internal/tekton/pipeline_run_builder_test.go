@@ -16,6 +16,7 @@ package tekton
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -25,6 +26,7 @@ import (
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 )
 
@@ -425,6 +427,32 @@ var _ = Describe("PipelineRun builder", func() {
 			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
 			Expect(task.TaskSpec.Volumes).To(HaveLen(2))
 			Expect(task.TaskSpec.Volumes[0].Name).ToNot(Equal(task.TaskSpec.Volumes[1].Name))
+		})
+
+		It("should use valid volume names for long secret names", func() {
+			longestSecretName := strings.Join([]string{
+				strings.Repeat("a", 40), strings.Repeat("b", 63), strings.Repeat("c", 63),
+				strings.Repeat("d", 63), strings.Repeat("e", 20),
+			}, ".")
+			for _, name := range []string{
+				strings.Repeat("a", 47),
+				strings.Repeat("a", 48),
+				longestSecretName,
+			} {
+				Expect(validation.IsDNS1123Subdomain(name)).To(BeEmpty())
+				builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+				builder.WithSecret(name, "/etc/secret", nil, nil)
+
+				task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+				volume := task.TaskSpec.Volumes[0]
+				Expect(validation.IsDNS1123Label(volume.Name)).To(BeEmpty())
+				Expect(volume.VolumeSource.Secret.SecretName).To(Equal(name))
+				for _, step := range task.TaskSpec.Steps {
+					Expect(step.VolumeMounts).To(ContainElement(
+						And(HaveField("Name", volume.Name), HaveField("MountPath", "/etc/secret")),
+					))
+				}
+			}
 		})
 
 		It("should set read-only to false when specified", func() {

@@ -28,7 +28,8 @@
 //	  "kite": {
 //	    "enabled": true,
 //	    "api-url": "https://kite.example.com"
-//	  }
+//	  },
+//	  "host-rules-secret-name": "shared-renovate-host-rules"
 //	}
 //
 // GitHub Token Configuration:
@@ -52,6 +53,11 @@
 //     log-analyzer step is added to the pipelinerun. Defaults to false.
 //   - api-url: The URL of the Kite API endpoint. Can also be set via
 //     KITE_API_URL environment variable (config file takes precedence).
+//
+// Global host rules:
+//
+//   - host-rules-secret-name: optional name of a Secret in the mintmaker
+//     namespace containing host-rules.json. The Secret is read for each run.
 package config
 
 import (
@@ -101,13 +107,15 @@ type KiteConfig struct {
 
 // Config holds all controller configuration.
 type Config struct {
-	GitHub GitHubConfig
-	Kite   KiteConfig
+	GitHub              GitHubConfig
+	Kite                KiteConfig
+	HostRulesSecretName string
 }
 
 // fileConfig represents the JSON structure of the config file.
 type fileConfig struct {
-	GitHub struct {
+	HostRulesSecretName string `json:"host-rules-secret-name"`
+	GitHub              struct {
 		TokenTTL         string `json:"token-ttl"`
 		TokenMinValidity string `json:"token-min-validity"`
 	} `json:"github"`
@@ -178,6 +186,7 @@ func parse(data []byte, log logr.Logger) *Config {
 	if fc.Kite.APIURL != "" {
 		cfg.Kite.APIURL = fc.Kite.APIURL
 	}
+	cfg.HostRulesSecretName = fc.HostRulesSecretName
 
 	if err := cfg.validate(log); err != nil {
 		return defaultConfig()

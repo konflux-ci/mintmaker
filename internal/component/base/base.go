@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
@@ -132,7 +133,7 @@ func (c *BaseComponent) GetRenovateBaseConfig(ctx context.Context, client client
 	renovateBaseConfigMutex.RLock()
 	if renovateBaseConfig != nil {
 		defer renovateBaseConfigMutex.RUnlock()
-		return renovateBaseConfig, nil
+		return runtime.DeepCopyJSON(renovateBaseConfig), nil
 	}
 	renovateBaseConfigMutex.RUnlock()
 
@@ -158,7 +159,7 @@ func (c *BaseComponent) GetRenovateBaseConfig(ctx context.Context, client client
 	renovateBaseConfigMutex.Lock()
 	renovateBaseConfig = config
 	renovateBaseConfigMutex.Unlock()
-	return config, nil
+	return runtime.DeepCopyJSON(config), nil
 }
 
 func getActivationKeyFromSecret(secret *corev1.Secret) (string, string, error) {

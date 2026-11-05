@@ -11,12 +11,13 @@ func TestParse(t *testing.T) {
 	log := logr.Discard()
 
 	tests := []struct {
-		name                string
-		data                string
-		expectedTokenTTL    time.Duration
-		expectedMinValidity time.Duration
-		expectedKiteEnabled bool
-		expectedKiteAPIURL  string
+		name                        string
+		data                        string
+		expectedTokenTTL            time.Duration
+		expectedMinValidity         time.Duration
+		expectedKiteEnabled         bool
+		expectedKiteAPIURL          string
+		expectedHostRulesSecretName string
 	}{
 		{
 			name: "valid full config",
@@ -25,15 +26,17 @@ func TestParse(t *testing.T) {
 					"token-ttl": "45m",
 					"token-min-validity": "15m"
 				},
+				"host-rules-secret-name": "shared-renovate-credentials",
 				"kite": {
 					"enabled": true,
 					"api-url": "https://kite.example.com"
 				}
 			}`,
-			expectedTokenTTL:    45 * time.Minute,
-			expectedMinValidity: 15 * time.Minute,
-			expectedKiteEnabled: true,
-			expectedKiteAPIURL:  "https://kite.example.com",
+			expectedTokenTTL:            45 * time.Minute,
+			expectedMinValidity:         15 * time.Minute,
+			expectedKiteEnabled:         true,
+			expectedKiteAPIURL:          "https://kite.example.com",
+			expectedHostRulesSecretName: "shared-renovate-credentials",
 		},
 		{
 			name:                "empty JSON uses defaults",
@@ -141,6 +144,9 @@ func TestParse(t *testing.T) {
 			}
 			if tc.expectedKiteAPIURL != "" && cfg.Kite.APIURL != tc.expectedKiteAPIURL {
 				t.Errorf("Kite.APIURL: expected %q, got %q", tc.expectedKiteAPIURL, cfg.Kite.APIURL)
+			}
+			if cfg.HostRulesSecretName != tc.expectedHostRulesSecretName {
+				t.Errorf("HostRulesSecretName: expected %q, got %q", tc.expectedHostRulesSecretName, cfg.HostRulesSecretName)
 			}
 		})
 	}
