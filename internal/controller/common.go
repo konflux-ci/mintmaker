@@ -17,48 +17,63 @@ package controller
 import (
 	"context"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
-	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
+	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
+	"github.com/konflux-ci/mintmaker/internal/component"
 )
 
-// Get only components that match a given namespace/application/componentname
-func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client) ([]appstudiov1alpha1.Component, error) {
-	components := []appstudiov1alpha1.Component{}
-	err := error(nil)
+func ignoreMissingCRD(err error) error {
+	if meta.IsNoMatchError(err) || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+// Get only components that match a given namespace/componentname
+func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client) ([]konfluxv1alpha1.Component, error) {
+	components := []konfluxv1alpha1.Component{}
 
 	// Iterate namespaces and create query filtered by namespace
 	for _, namespace := range namespaces {
-		namespaceComponentList := &appstudiov1alpha1.ComponentList{}
-		listOps := &client.ListOptions{
-			Namespace: namespace.Namespace,
+		konfluxList := &konfluxv1alpha1.ComponentList{}
+		if err := apiClient.List(ctx, konfluxList, client.InNamespace(namespace.Namespace)); err != nil {
+			if err := ignoreMissingCRD(err); err != nil {
+				return nil, err
+			}
 		}
-		if err := apiClient.List(ctx, namespaceComponentList, listOps); err != nil {
-			return nil, err
+		legacyList := &appstudiov1alpha1.ComponentList{}
+		if err := apiClient.List(ctx, legacyList, client.InNamespace(namespace.Namespace)); err != nil {
+			if err := ignoreMissingCRD(err); err != nil {
+				return nil, err
+			}
 		}
+		merged := mergeKonfluxAndLegacyComponents(konfluxList.Items, legacyList.Items)
+
 		// No applications specified -> add all Namespace components, start processing next namespace
 		if len(namespace.Applications) == 0 {
-			components = append(components, namespaceComponentList.Items...)
+			components = append(components, merged...)
 			continue
 		}
-		// Applications specified -> iterate and filter by application
+
+		// New component model does not include application name.
+		// Only component names are used for filtering.
 		for _, application := range namespace.Applications {
-			appMatchingComponents := []appstudiov1alpha1.Component{}
-			for _, component := range namespaceComponentList.Items {
-				if application.Application == component.Spec.Application {
-					appMatchingComponents = append(appMatchingComponents, component)
-				}
-			}
-			// No components specified for an application -> add all application components, start processing next application
+			// No components specified -> add all namespace components
 			if len(application.Components) == 0 {
-				components = append(components, appMatchingComponents...)
-				continue
+				components = append(components, merged...)
+				break
 			}
 			// Components specified -> add components with matching names
 			for _, filterComponent := range application.Components {
-				for _, component := range appMatchingComponents {
-					if filterComponent == mmv1alpha1.Component(component.Name) {
-						components = append(components, component)
+				for _, comp := range merged {
+					if filterComponent == mmv1alpha1.Component(comp.Name) {
+						components = append(components, comp)
 						break
 					}
 				}
@@ -66,5 +81,28 @@ func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.Namespac
 		}
 	}
 
-	return components, err
+	return components, nil
+}
+
+func mergeKonfluxAndLegacyComponents(konflux []konfluxv1alpha1.Component, legacy []appstudiov1alpha1.Component) []konfluxv1alpha1.Component {
+	seen := make(map[string]struct{}, len(konflux)+len(legacy))
+	out := make([]konfluxv1alpha1.Component, 0, len(konflux)+len(legacy))
+
+	for i := range konflux {
+		c := konflux[i]
+		key := c.Namespace + "/" + c.Name
+		seen[key] = struct{}{}
+		out = append(out, c)
+	}
+
+	for i := range legacy {
+		key := legacy[i].Namespace + "/" + legacy[i].Name
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, *component.ToKonfluxComponent(&legacy[i]))
+	}
+
+	return out
 }

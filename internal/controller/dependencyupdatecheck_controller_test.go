@@ -22,14 +22,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
+
+	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
 	"github.com/konflux-ci/mintmaker/internal/component"
 	"github.com/konflux-ci/mintmaker/internal/component/mocks"
+	"github.com/konflux-ci/mintmaker/internal/config"
 	. "github.com/konflux-ci/mintmaker/internal/constant"
 	"github.com/konflux-ci/mintmaker/internal/utils"
 )
@@ -67,16 +71,16 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				)
 
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, appComp *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, comp *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
-					branches := component.GetVersions(appComp)
+					branches := component.GetVersions(comp)
 					if len(branches) == 0 {
 						branches = []string{"main"}
 					}
 					mockComp.EXPECT().GetBranches().Return(branches, nil).Maybe()
-					mockComp.EXPECT().GetName().Return(appComp.Name).Maybe()
-					mockComp.EXPECT().GetNamespace().Return(appComp.Namespace).Maybe()
-					mockComp.EXPECT().GetApplication().Return(appComp.Spec.Application).Maybe()
+					mockComp.EXPECT().GetName().Return(comp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(comp.Namespace).Maybe()
+					mockComp.EXPECT().GetApplication().Return(comp.Annotations[MintMakerConvertedApplicationAnnotation]).Maybe()
 					mockComp.EXPECT().GetPlatform().Return("github").Maybe()
 					mockComp.EXPECT().GetHost().Return("github.com").Maybe()
 					mockComp.EXPECT().GetRepository().Return("testcomp").Maybe()
@@ -105,12 +109,12 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				}
 				// Override mock to return only 2 of 3 versions as branches
 				gt := GinkgoT()
-				newGitComponentForTest = func(_ context.Context, appComp *appstudiov1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+				newGitComponentForTest = func(_ context.Context, comp *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
 					mockComp := mocks.NewMockGitComponent(gt)
 					mockComp.EXPECT().GetBranches().Return([]string{"gitrevision", "gitrevision-v1"}, nil).Maybe()
-					mockComp.EXPECT().GetName().Return(appComp.Name).Maybe()
-					mockComp.EXPECT().GetNamespace().Return(appComp.Namespace).Maybe()
-					mockComp.EXPECT().GetApplication().Return(appComp.Spec.Application).Maybe()
+					mockComp.EXPECT().GetName().Return(comp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(comp.Namespace).Maybe()
+					mockComp.EXPECT().GetApplication().Return(comp.Annotations[MintMakerConvertedApplicationAnnotation]).Maybe()
 					mockComp.EXPECT().GetPlatform().Return("github").Maybe()
 					mockComp.EXPECT().GetHost().Return("github.com").Maybe()
 					mockComp.EXPECT().GetRepository().Return("testcomp").Maybe()
@@ -147,7 +151,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				for i, branch := range branches {
 					hashValue := utils.RepoBranchHash("github.com", "testcomp", branch)
 					labels := map[string]string{
-						MintMakerRepoBranchHashLabel: hashValue,
+						MintMakerRepoBranchHashLabelLegacy: hashValue,
 					}
 					createMintmakerPipelineRun(fmt.Sprintf("existing-active-pr-%d", i), MintMakerNamespaceName, labels, "")
 				}
@@ -164,7 +168,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				// Pre-create a completed PipelineRun for the first branch
 				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
 				labels := map[string]string{
-					MintMakerRepoBranchHashLabel: hashValue,
+					MintMakerRepoBranchHashLabelLegacy: hashValue,
 				}
 				createMintmakerPipelineRun("completed-pr", MintMakerNamespaceName, labels, corev1.ConditionTrue)
 
@@ -180,7 +184,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				// Pre-create a failed PipelineRun for the first branch
 				hashValue := utils.RepoBranchHash("github.com", "testcomp", "gitrevision")
 				labels := map[string]string{
-					MintMakerRepoBranchHashLabel: hashValue,
+					MintMakerRepoBranchHashLabelLegacy: hashValue,
 				}
 				createMintmakerPipelineRun("failed-pr", MintMakerNamespaceName, labels, corev1.ConditionFalse)
 
@@ -190,6 +194,116 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(1 + expectedPipelineRuns))
 
 				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
+			Context("When Spec.Namespaces filters components", func() {
+
+				It("should create pipelineruns for components in the specified namespace", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{Namespace: componentNamespace},
+					})
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not create pipelineruns when the specified namespace has no matching components", func() {
+					createNamespace("other-namespace")
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{Namespace: "other-namespace"},
+					})
+					Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should create pipelineruns when the specified component name matches", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{
+							Namespace: componentNamespace,
+							Applications: []mmv1alpha1.ApplicationSpec{
+								{
+									Application: "app",
+									Components:  []mmv1alpha1.Component{componentName},
+								},
+							},
+						},
+					})
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not create pipelineruns when the specified component name does not match", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, []mmv1alpha1.NamespaceSpec{
+						{
+							Namespace: componentNamespace,
+							Applications: []mmv1alpha1.ApplicationSpec{
+								{
+									Application: "app",
+									Components:  []mmv1alpha1.Component{"othercomp"},
+								},
+							},
+						},
+					})
+					Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+			})
+
+			Context("When Kite integration is enabled", func() {
+
+				const kiteSecretName = "kite-token"
+
+				kiteSecretKey := types.NamespacedName{Namespace: MintMakerNamespaceName, Name: kiteSecretName}
+
+				buildStepNames := func(plr tektonv1.PipelineRun) []string {
+					var stepNames []string
+					for _, task := range plr.Spec.PipelineSpec.Tasks {
+						if task.Name != "build" || task.TaskSpec == nil {
+							continue
+						}
+						for _, step := range task.TaskSpec.Steps {
+							stepNames = append(stepNames, step.Name)
+						}
+					}
+					return stepNames
+				}
+
+				_ = BeforeEach(func() {
+					cfg := config.Get()
+					cfg.Kite.Enabled = true
+
+					createSecret(kiteSecretKey, corev1.SecretTypeOpaque, map[string][]byte{
+						"token": []byte("fake-kite-token"),
+					}, nil)
+					kiteSecret := getSecret(kiteSecretKey)
+					kiteSecret.Labels = map[string]string{KiteTokenSecretLabel: "true"}
+					Expect(k8sClient.Update(ctx, kiteSecret)).Should(Succeed())
+				})
+
+				_ = AfterEach(func() {
+					cfg := config.Get()
+					cfg.Kite.Enabled = false
+					deleteSecret(kiteSecretKey)
+				})
+
+				It("should add a log-analyzer step to the PipelineRun", func() {
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					Expect(buildStepNames(listPipelineRuns(MintMakerNamespaceName)[0])).To(ContainElement("log-analyzer"))
+
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
+
+				It("should not add a log-analyzer step when the kite token secret is missing", func() {
+					deleteSecret(kiteSecretKey)
+
+					createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+
+					Eventually(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(expectedPipelineRuns))
+					Expect(buildStepNames(listPipelineRuns(MintMakerNamespaceName)[0])).NotTo(ContainElement("log-analyzer"))
+
+					deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+				})
 			})
 
 			Context("When getting a merged docker config for a pipelinerun", func() {
@@ -290,7 +404,7 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 
 					// Add the internal label to the registry secret
 					registrySecret := getSecret(registrySecretKey)
-					registrySecret.Labels = map[string]string{InternalSecretLabelName: "true"}
+					registrySecret.Labels = map[string]string{InternalSecretLabel: "true"}
 					Expect(k8sClient.Update(ctx, registrySecret)).Should(Succeed())
 
 					// Link the registry secret to the service account
