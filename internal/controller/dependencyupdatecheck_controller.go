@@ -444,9 +444,9 @@ func (r *DependencyUpdateCheckReconciler) createPipelineRun(ctx context.Context,
 	return pipelineRun, nil
 }
 
-// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=appstudio.redhat.com,resources=dependencyupdatechecks/finalizers,verbs=update
+// +kubebuilder:rbac:groups=konflux-ci.dev,resources=dependencyupdatechecks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=konflux-ci.dev,resources=dependencyupdatechecks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=konflux-ci.dev,resources=dependencyupdatechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=appstudio.redhat.com,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns/finalizers,verbs=update
