@@ -18,6 +18,7 @@ import (
 	"context"
 	"testing"
 
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +27,82 @@ import (
 	"github.com/konflux-ci/mintmaker/internal/component/base"
 	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
 )
+
+func TestNewComponent(t *testing.T) {
+	tests := []struct {
+		name           string
+		gitURL         string
+		versions       []string
+		expectError    bool
+		wantHost       string
+		wantRepository string
+		wantPlatform   string
+	}{
+		{
+			name:           "valid gitlab URL",
+			gitURL:         "https://gitlab.com/org/repo.git",
+			versions:       []string{"main"},
+			wantHost:       "gitlab.com",
+			wantRepository: "org/repo",
+			wantPlatform:   "gitlab",
+		},
+		{
+			name:        "unsupported platform",
+			gitURL:      "https://bitbucket.org/org/repo.git",
+			expectError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := &konfluxv1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-comp",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						mmconst.MintMakerConvertedApplicationAnnotation: "test-app",
+					},
+				},
+			}
+
+			got, err := NewComponent(context.Background(), comp, nil, tc.gitURL, tc.versions)
+			if tc.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got.Name != "test-comp" {
+				t.Errorf("Name: got %q, want %q", got.Name, "test-comp")
+			}
+			if got.Namespace != "test-ns" {
+				t.Errorf("Namespace: got %q, want %q", got.Namespace, "test-ns")
+			}
+			if got.Application != "test-app" {
+				t.Errorf("Application: got %q, want %q", got.Application, "test-app")
+			}
+			if got.Host != tc.wantHost {
+				t.Errorf("Host: got %q, want %q", got.Host, tc.wantHost)
+			}
+			if got.Repository != tc.wantRepository {
+				t.Errorf("Repository: got %q, want %q", got.Repository, tc.wantRepository)
+			}
+			if got.Platform != tc.wantPlatform {
+				t.Errorf("Platform: got %q, want %q", got.Platform, tc.wantPlatform)
+			}
+			if got.GitURL != tc.gitURL {
+				t.Errorf("GitURL: got %q, want %q", got.GitURL, tc.gitURL)
+			}
+			if len(got.Versions) != len(tc.versions) {
+				t.Errorf("Versions: got %d, want %d", len(got.Versions), len(tc.versions))
+			}
+		})
+	}
+}
 
 func newTestComponent(cl client.Client, host, repository string) *Component {
 	return &Component{

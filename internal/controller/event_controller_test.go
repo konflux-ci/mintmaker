@@ -337,6 +337,97 @@ var _ = Describe("Event Controller", func() {
 					return string(updatedPR.Spec.Status)
 				}, time.Second*10).Should(Equal(string(tektonv1.PipelineRunSpecStatusCancelled)))
 			})
+
+			It("should not add renovate token when git host does not match pod labels", func() {
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetHost().Return("other.example.com").Maybe()
+					mockComp.EXPECT().GetRepository().Return(gitRepository).Maybe()
+					mockComp.EXPECT().GetToken().Return("fake-token", nil).Maybe()
+					return mockComp, nil
+				}
+
+				event := &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-event-host-mismatch",
+						Namespace: MintMakerNamespaceName,
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      podName,
+						Namespace: MintMakerNamespaceName,
+					},
+					Reason:  "FailedMount",
+					Message: `MountVolume.SetUp failed for volume "` + volumeName + `" : references non-existent secret key: renovate-token`,
+				}
+				Expect(k8sClient.Create(ctx, event)).Should(Succeed())
+
+				Consistently(func() map[string][]byte {
+					updatedSecret := &corev1.Secret{}
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: MintMakerNamespaceName}, updatedSecret)
+					return updatedSecret.Data
+				}).ShouldNot(HaveKey("renovate-token"))
+			})
+
+			It("should not add renovate token when git repository does not match pod labels", func() {
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetHost().Return(gitHost).Maybe()
+					mockComp.EXPECT().GetRepository().Return("owner/other-repo").Maybe()
+					mockComp.EXPECT().GetToken().Return("fake-token", nil).Maybe()
+					return mockComp, nil
+				}
+
+				event := &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-event-repo-mismatch",
+						Namespace: MintMakerNamespaceName,
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      podName,
+						Namespace: MintMakerNamespaceName,
+					},
+					Reason:  "FailedMount",
+					Message: `MountVolume.SetUp failed for volume "` + volumeName + `" : references non-existent secret key: renovate-token`,
+				}
+				Expect(k8sClient.Create(ctx, event)).Should(Succeed())
+
+				Consistently(func() map[string][]byte {
+					updatedSecret := &corev1.Secret{}
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: MintMakerNamespaceName}, updatedSecret)
+					return updatedSecret.Data
+				}).ShouldNot(HaveKey("renovate-token"))
+			})
+
+			It("should not add renovate token when NewGitComponent fails", func() {
+				newGitComponentForTest = func(_ context.Context, _ *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					return nil, errors.New("failed to create git component")
+				}
+
+				event := &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-event-gitcomponent-error",
+						Namespace: MintMakerNamespaceName,
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      podName,
+						Namespace: MintMakerNamespaceName,
+					},
+					Reason:  "FailedMount",
+					Message: `MountVolume.SetUp failed for volume "` + volumeName + `" : references non-existent secret key: renovate-token`,
+				}
+				Expect(k8sClient.Create(ctx, event)).Should(Succeed())
+
+				Consistently(func() map[string][]byte {
+					updatedSecret := &corev1.Secret{}
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: MintMakerNamespaceName}, updatedSecret)
+					return updatedSecret.Data
+				}).ShouldNot(HaveKey("renovate-token"))
+			})
 		})
 	}
 })

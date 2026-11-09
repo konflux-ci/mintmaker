@@ -127,6 +127,21 @@ var _ = Describe("DependencyUpdateCheck Controller", func() {
 				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
 			})
 
+			It("should not create a pipelinerun if GetBranches fails", func() {
+				gt := GinkgoT()
+				newGitComponentForTest = func(_ context.Context, comp *konfluxv1alpha1.Component, _ client.Client) (component.GitComponent, error) {
+					mockComp := mocks.NewMockGitComponent(gt)
+					mockComp.EXPECT().GetBranches().Return(nil, fmt.Errorf("failed to get branches")).Maybe()
+					mockComp.EXPECT().GetName().Return(comp.Name).Maybe()
+					mockComp.EXPECT().GetNamespace().Return(comp.Namespace).Maybe()
+					return mockComp, nil
+				}
+
+				createDependencyUpdateCheck(dependencyUpdateCheckKey, false, nil)
+				Consistently(listPipelineRuns).WithArguments(MintMakerNamespaceName).Should(HaveLen(0))
+				deleteDependencyUpdateCheck(dependencyUpdateCheckKey)
+			})
+
 			It("should not create a pipelinerun if the DependencyUpdateCheck CR has been processed before", func() {
 				// Create a DependencyUpdateCheck CR in "mintmaker" namespace, that was processed before
 				createDependencyUpdateCheck(dependencyUpdateCheckKey, true, nil)
