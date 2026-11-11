@@ -27,12 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	tektonv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-)
 
-var (
-	MintMakerGitPlatformLabel        = "mintmaker.appstudio.redhat.com/git-platform"
-	MintMakerComponentNameLabel      = "mintmaker.appstudio.redhat.com/component"
-	MintMakerComponentNamespaceLabel = "mintmaker.appstudio.redhat.com/namespace"
+	mmconst "github.com/konflux-ci/mintmaker/internal/constant"
+	"github.com/konflux-ci/mintmaker/internal/utils"
 )
 
 // PipelineRunReconciler reconciles a PipelineRun object
@@ -68,10 +65,13 @@ func (r *PipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 								log := ctrl.Log.WithName("PipelineRunController")
 								log.Info(
 									"PipelineRun finished", "pipelineRun", newPipelineRun.Name,
-									"component", newPipelineRun.Labels[MintMakerComponentNameLabel],
-									"componentNamespace", newPipelineRun.Labels[MintMakerComponentNamespaceLabel],
-									"repository", strings.ReplaceAll(newPipelineRun.Labels["mintmaker.appstudio.redhat.com/repository"], "_", "/"),
-									"gitHost", newPipelineRun.Labels["mintmaker.appstudio.redhat.com/git-host"],
+									"component", utils.GetLabel(newPipelineRun, mmconst.MintMakerComponentNameLabel, mmconst.MintMakerComponentNameLabelLegacy),
+									"componentNamespace", utils.GetLabel(newPipelineRun, mmconst.MintMakerComponentNamespaceLabel, mmconst.MintMakerComponentNamespaceLabelLegacy),
+									"repository", strings.ReplaceAll(
+										utils.GetLabel(newPipelineRun, mmconst.MintMakerRepositoryLabel, mmconst.MintMakerRepositoryLabelLegacy),
+										"_", "/",
+									),
+									"gitHost", utils.GetLabel(newPipelineRun, mmconst.MintMakerGitHostLabel, mmconst.MintMakerGitHostLabelLegacy),
 									"completionTime",
 									newPipelineRun.Status.CompletionTime.Format(time.RFC3339),
 									"success",

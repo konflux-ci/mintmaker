@@ -40,6 +40,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	konfluxv1alpha1 "github.com/konflux-ci/application-api/api/konflux/v1alpha1"
 	appstudiov1alpha1 "github.com/konflux-ci/application-api/api/v1alpha1"
 
 	mmv1alpha1 "github.com/konflux-ci/mintmaker/api/v1alpha1"
@@ -59,6 +60,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(appstudiov1alpha1.AddToScheme(scheme))
+	utilruntime.Must(konfluxv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(mmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(tektonv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
@@ -159,6 +161,7 @@ func main() {
 					&corev1.ConfigMap{},
 					&corev1.Pod{},
 					&appstudiov1alpha1.Component{},
+					&konfluxv1alpha1.Component{},
 				},
 			},
 		},
