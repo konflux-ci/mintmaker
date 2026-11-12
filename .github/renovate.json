@@ -57,6 +57,22 @@
         "github-actions"
       ],
       "groupName": "github actions"
+    },
+    {
+      "description": "Automerge digest updates for Red Hat published images",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchPackageNames": [
+        "/^registry\\.access\\.redhat\\.com\\//",
+        "/^registry\\.redhat\\.io\\//"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
     }
   ]
 }
