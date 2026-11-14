@@ -47,7 +47,7 @@ Run from the repository root. See `make help` for every target.
 - **External libraries**: Add new external libraries only when completely necessary. Run `go mod tidy` whenever dependencies are added, removed, or upgraded. Include resulting `go.mod` and `go.sum` in the commit.
 - **Logging**: Use controller-runtime `log` from context with structured keys (`component`, `namespace`, `repository`).
 - **Errors**: Wrap with `%w`; use `errors.IsNotFound` for missing API objects.
-- **Reconcile invariants**: Respect `mintmaker.appstudio.redhat.com/processed` on DUCs, `disabled: "true"` on Components, PipelineRun deduplication by repo+branch hash, and registry pull secrets from `build-pipeline-<component>` ServiceAccounts.
+- **Reconcile invariants**: Respect `mintmaker.konflux-ci.dev/processed` on DUCs, `disabled: "true"` on Components, PipelineRun deduplication by repo+branch hash, and registry pull secrets from `build-pipeline-<component>` ServiceAccounts.
 - **OSV tools**: `tools/osv-generator/` and `tools/osv-downloader/` are standalone; not part of the operator reconcile loop unless the task targets them. Do not change this.
 - **Secrets**: Never commit tokens, keys, or kubeconfig snippets.
 - **Documentation**: Update the corresponding parts of documentation (root `README.md` and other documentation under `docs/`) to reflect changes made when applicable.

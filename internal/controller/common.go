@@ -35,7 +35,7 @@ func ignoreMissingCRD(err error) error {
 	return err
 }
 
-// Get only components that match a given namespace/componentname
+// Get only components that match a given namespace/component name
 func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.NamespaceSpec, apiClient client.Client) ([]konfluxv1alpha1.Component, error) {
 	components := []konfluxv1alpha1.Component{}
 
@@ -55,27 +55,17 @@ func getFilteredComponents(ctx context.Context, namespaces []mmv1alpha1.Namespac
 		}
 		merged := mergeKonfluxAndLegacyComponents(konfluxList.Items, legacyList.Items)
 
-		// No applications specified -> add all Namespace components, start processing next namespace
-		if len(namespace.Applications) == 0 {
+		// No components specified -> add all namespace components, start processing next namespace
+		if len(namespace.Components) == 0 {
 			components = append(components, merged...)
 			continue
 		}
-
-		// New component model does not include application name.
-		// Only component names are used for filtering.
-		for _, application := range namespace.Applications {
-			// No components specified -> add all namespace components
-			if len(application.Components) == 0 {
-				components = append(components, merged...)
-				break
-			}
-			// Components specified -> add components with matching names
-			for _, filterComponent := range application.Components {
-				for _, comp := range merged {
-					if filterComponent == mmv1alpha1.Component(comp.Name) {
-						components = append(components, comp)
-						break
-					}
+		// Components specified -> add components with matching names
+		for _, filterComponent := range namespace.Components {
+			for _, comp := range merged {
+				if filterComponent == mmv1alpha1.Component(comp.Name) {
+					components = append(components, comp)
+					break
 				}
 			}
 		}

@@ -10,14 +10,14 @@ Deployment manifests and environment-specific pins (image tags, Renovate config 
 
 ## Custom resources
 
-### DependencyUpdateCheck (`appstudio.redhat.com/v1alpha1`)
+### DependencyUpdateCheck (`konflux-ci.dev/v1alpha1`)
 
 - **Scope**: Namespaced; in production, created in `mintmaker`.
 - **Purpose**: Trigger one dependency-update pass.
-- **Spec**: Optional `namespaces[]` tree to filter by Konflux namespace → application → component. Empty spec means all `Component` resources the controller can list.
-- **Behavior**: Processed once per object (see `mintmaker.appstudio.redhat.com/processed` annotation).
+- **Spec**: Optional `namespaces[]` tree to filter by Konflux namespace → component. Empty spec means all `Component` resources the controller can list.
+- **Behavior**: Processed once per object (see `mintmaker.konflux-ci.dev/processed` annotation).
 
-Example: [config/samples/appstudio_v1alpha1_dependencyupdatecheck.yaml](../config/samples/appstudio_v1alpha1_dependencyupdatecheck.yaml).
+Example: [config/samples/konflux_v1alpha1_dependencyupdatecheck.yaml](../config/samples/konflux_v1alpha1_dependencyupdatecheck.yaml).
 
 ### Konflux Component (external API)
 
@@ -83,7 +83,7 @@ Platform detection: [internal/utils/utils.go](../internal/utils/utils.go) (`GetG
 
 `PipelineRunBuilder` constructs PipelineRuns with:
 
-- Renovate image from `RENOVATE_IMAGE` env (from Deployment annotation `mintmaker.appstudio.redhat.com/renovate-image`, default `quay.io/konflux-ci/mintmaker-renovate-image:latest`).
+- Renovate image from `RENOVATE_IMAGE` env (from Deployment annotation `mintmaker.konflux-ci.dev/renovate-image`, default `quay.io/konflux-ci/mintmaker-renovate-image:latest`).
 - Mounted Renovate config (global + per-run).
 - Git credentials and optional registry docker config.
 - Labels for component, namespace, git host, repository hash (for deduplication).
