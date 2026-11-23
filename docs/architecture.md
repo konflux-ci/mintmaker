@@ -87,6 +87,7 @@ Platform detection: [internal/utils/utils.go](../internal/utils/utils.go) (`GetG
 - Mounted Renovate config (global + per-run).
 - Git credentials and optional registry docker config.
 - Labels for component, namespace, git host, repository hash (for deduplication).
+- `RPM_LOCKFILE_PROTOTYPE_DNF_CACHE=/var/cache/rpm-lockfile-dnf-cache` on the renovate step, so `rpm-lockfile-prototype`/`refresh-rpm-lockfiles` runs within the same PipelineRun share one DNF cache directory instead of re-downloading RPM metadata and packages for every lockfile refreshed. The cache lives on the pod's local (ephemeral) storage, so it does not persist or grow unbounded across PipelineRuns — it is discarded when the pod terminates.
 
 ## Configuration
 

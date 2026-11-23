@@ -442,6 +442,27 @@ var _ = Describe("PipelineRun builder", func() {
 		})
 	})
 
+	When("renovate step is created", func() {
+		It("should set the expected environment variables", func() {
+			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
+			task := builder.pipelineRun.Spec.PipelineSpec.Tasks[0]
+			renovateStep := task.TaskSpec.Steps[2]
+
+			Expect(renovateStep.Name).To(Equal("renovate"))
+			Expect(renovateStep.Env).To(ContainElements(
+				corev1.EnvVar{Name: "HOME", Value: "/home/renovate"},
+				corev1.EnvVar{Name: "LOG_LEVEL", Value: "debug"},
+				corev1.EnvVar{Name: "LOG_FORMAT", Value: "json"},
+				corev1.EnvVar{Name: "OSV_OFFLINE_DISABLE_DOWNLOAD", Value: "true"},
+				corev1.EnvVar{Name: "OSV_OFFLINE_ROOT_DIR", Value: "/workspace/shared-data/osv-db"},
+				corev1.EnvVar{Name: "DNF_VAR_SSL_CLIENT_KEY", Value: "/workspace/shared-data/rpm-certs/key.pem"},
+				corev1.EnvVar{Name: "DNF_VAR_SSL_CLIENT_CERT", Value: "/workspace/shared-data/rpm-certs/cert.pem"},
+				corev1.EnvVar{Name: "RENOVATE_X_GITLAB_AUTO_MERGEABLE_CHECK_ATTEMPS", Value: "7"},
+				corev1.EnvVar{Name: "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", Value: "/var/cache/rpm-lockfile-dnf-cache"},
+			))
+		})
+	})
+
 	When("log-sanitizer step is created", func() {
 		It("should include a log-sanitizer step after the renovate step", func() {
 			builder := NewPipelineRunBuilder("testPrefix", "testNamespace")
