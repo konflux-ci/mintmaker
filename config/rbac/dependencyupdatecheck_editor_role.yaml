@@ -8,7 +8,7 @@ metadata:
   name: dependencyupdatecheck-editor-role
 rules:
 - apiGroups:
-  - appstudio.redhat.com
+  - konflux-ci.dev
   resources:
   - dependencyupdatechecks
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - appstudio.redhat.com
+  - konflux-ci.dev
   resources:
   - dependencyupdatechecks/status
   verbs:

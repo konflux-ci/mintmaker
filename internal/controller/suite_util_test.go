@@ -271,12 +271,12 @@ func deleteComponent(resourceKey types.NamespacedName) {
 func createDependencyUpdateCheck(resourceKey types.NamespacedName, processed bool, namespaces []mmv1alpha1.NamespaceSpec) {
 	annotations := map[string]string{}
 	if processed {
-		annotations[MintMakerProcessedAnnotationNameLegacy] = "true"
+		annotations[MintMakerProcessedAnnotationName] = "true"
 	}
 
 	dependencyUpdateCheck := &mmv1alpha1.DependencyUpdateCheck{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "appstudio.redhat.com/v1alpha1",
+			APIVersion: "konflux-ci.dev/v1alpha1",
 			Kind:       "DependencyUpdateCheck",
 		},
 		ObjectMeta: metav1.ObjectMeta{
